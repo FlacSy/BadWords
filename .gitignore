@@ -1,3 +1,4 @@
 .libtest
 .vscode
+.python-version
 __pycache__/
