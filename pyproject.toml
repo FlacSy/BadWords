@@ -26,3 +26,6 @@ classifiers = [
 Homepage = "https://github.com/FlacSy/badwords"
 Repository = "https://github.com/FlacSy/badwords.git"
 Issues = "https://github.com/FlacSy/badwords/issues"
+
+[tool.ruff]
+select = ["ALL"]
