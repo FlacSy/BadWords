@@ -30,18 +30,16 @@ class ProfanityFilter:
             else:
                 raise NotSupportedLanguage
 
-        self.bad_words = self.initialize_bad_words()
+        self.bad_words = await self.initialize_bad_words()
 
     async def initialize_language_files(self: Self) -> list[str]:
         """Initialize language files.
 
         :return: Dictionary mapping language names to file paths.
         """
-        return (
-            str(path)[-6:-4] for path in (self.resource_dir).iterdir()
-        )
+        return [str(path)[-6:-4] for path in (self.resource_dir).iterdir()]
 
-    def initialize_bad_words(self: Self) -> set[str]:
+    async def initialize_bad_words(self: Self) -> set[str]:
         """Initialize profanity words for each language.
 
         :return: Dictionary mapping language names to sets of profanity words.
@@ -95,7 +93,7 @@ class ProfanityFilter:
 
             if 0 < match_threshold < 1:
                 for bad_word in self.bad_words:
-                    if self.similar(word, bad_word) > match_threshold:
+                    if await self.similar(word, bad_word) > match_threshold:
                         if replace_character:
                             return text.replace(word)
                         return True
