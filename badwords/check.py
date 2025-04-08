@@ -2,82 +2,64 @@
 
 from __future__ import annotations
 
-import re
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Self
+
+from .exceptions import NotSupportedLanguage
 
 
 class ProfanityFilter:
     """A class for filtering profanity from text."""
 
     async def init(self: Self,
-        languages: list[str] | None = None,
-        all_languages: bool | None = None,
-    ) -> None:
+            languages: list[str] | None = None,
+        ) -> None:
         """Initialize the profanity filter.
 
         :param languages: List of languages to load profanity words for.
         :param all_languages: Flag to load profanity words for all available languages.
         """
-        self.script_dir = Path(__file__).parent
-        self.language_files: dict[str, str] = await self.initialize_language_files()
-        self.languages = languages or list(self.language_files.keys()) if\
-            all_languages else languages
-        self.bad_words: dict[str, set[str]] = self.initialize_bad_words()
-        self.patterns: dict[str, re.Pattern] = await self.compile_patterns()
-        self.custom_bad_words: set[str] = set()
+        self.resource_dir = Path(__file__).parent / "resource"
 
-    async def initialize_language_files(self: Self) -> dict[str, str]:
+        self.language_files = await self.initialize_language_files()
+
+        if languages:
+            if all(i in self.language_files for i in languages):
+                self.language_files = languages
+            else:
+                raise NotSupportedLanguage
+
+        self.bad_words = self.initialize_bad_words()
+
+    async def initialize_language_files(self: Self) -> list[str]:
         """Initialize language files.
 
         :return: Dictionary mapping language names to file paths.
         """
-        resource_dir = Path(self.script_dir) / "resource"
+        return (
+            str(path)[-6:-4] for path in (self.resource_dir).iterdir()
+        )
 
-        result = {}
-
-        for filename in Path(resource_dir).iterdir():
-            path = Path(filename)
-            root = path.parent / path.stem
-
-            result[root] = Path(resource_dir) / filename
-
-        return result
-
-    def initialize_bad_words(self: Self) -> dict[str, set[str]]:
+    def initialize_bad_words(self: Self) -> set[str]:
         """Initialize profanity words for each language.
 
         :return: Dictionary mapping language names to sets of profanity words.
         """
-        bad_words = {}
+        bad_words = set()
 
-        for language in self.languages:
-            file_path = self.language_files.get(language)
-            if file_path:
-                with Path(file_path).open(encoding="utf-8") as file:
-                    bad_words[language] = {line.strip() for line in file}
+        for lang in self.language_files:
+            with (self.resource_dir / f"{lang}.bdw").open(encoding="utf-8") as f:
+                bad_words.update(f.read().split())
 
         return bad_words
-
-    async def compile_patterns(self: Self) -> dict[str, re.Pattern]:
-        """Compile regular expression patterns for profanity words.
-
-        :return: Dictionary mapping language names to compiled regex patterns.
-        """
-        result = {}
-
-        for language, words in self.bad_words.items():
-            result[language] = re.compile(
-                r"\b(?:" + "|".join(map(re.escape, words)) + r")\b", re.IGNORECASE,
-            )
 
     async def add_words(self: Self, words: list[str]) -> None:
         """Add custom profanity words to the filter.
 
         :param words: List of custom profanity words.
         """
-        self.custom_bad_words.update(words)
+        self.bad_words.update(words)
 
     async def similar(self: Self, a: str, b: str) -> float:
         """Compute similarity ratio between two strings.
@@ -89,10 +71,10 @@ class ProfanityFilter:
         return SequenceMatcher(None, a, b).ratio()
 
     async def filter_text(
-        self: Self, text: str,
-        match_threshold: float | None = None,
-        replace_character: str | None = None,
-    ) -> bool | str:
+            self: Self, text: str,
+            match_threshold: float | None = None,
+            replace_character: str | None = None,
+        ) -> bool | str:
         """Check if the given text contains profanity.
 
         :param text: Input text to check.
@@ -105,18 +87,19 @@ class ProfanityFilter:
         if not match_threshold:
             match_threshold = 1
 
-        all_bad_words = set.union(self.custom_bad_words, *self.bad_words.values())
+        text = text.lower()
 
-        filtered_text = text.lower()
-        words_in_text = filtered_text.split()
+        for word in text.split():
+            if word in self.bad_words:
+                return True
 
-        for word in words_in_text:
-            for bad_word in all_bad_words:
-                if match_threshold != 1 and \
-                  self.similar(word, bad_word) > match_threshold:
-                    if replace_character:
-                        return filtered_text.replace(word)
-                    return True
+            if 0 < match_threshold < 1:
+                for bad_word in self.bad_words:
+                    if self.similar(word, bad_word) > match_threshold:
+                        if replace_character:
+                            return text.replace(word)
+                        return True
+
         return False
 
     async def get_all_languages(self: Self) -> list[str]:
@@ -124,4 +107,4 @@ class ProfanityFilter:
 
         :return: List of all language names.
         """
-        return list(self.language_files.keys())
+        return self.language_files
