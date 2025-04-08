@@ -2,3 +2,6 @@
 .vscode
 .python-version
 __pycache__/
+.ruff_cache
+.mypy_cache
+*test*
