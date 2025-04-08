@@ -41,24 +41,34 @@ pip3 install git+https://github.com/FlacSy/badwords.git
 ### Инициализация
 
 ```python
-ProfanityFilter(languages: List[str] = None, all_languages: bool = False)
+p = ProfanityFilter()
+
+p.init(languages: List[str] | None = None)
 ```
 
 #### Параметры
 
-- `languages` (список строк, необязательно): Список языков, для которых будут загружены слова нецензурной лексики. Если не указано, будут использованы все доступные языки при установке флага `all_languages` в `True`.
-- `all_languages` (логическое значение, необязательно): Флаг для загрузки слов нецензурной лексики для всех доступных языков. По умолчанию `False`.
+- `languages` (список строк, необязательно): Список языков, для которых будут загружены слова нецензурной лексики. Если не указано, будут использованы все доступные языки.
 
 ### Примеры использования
 
 ```python
+import asyncio
+
 from badwords import ProfanityFilter
 
-# Инициализация с использованием английского и испанского языков
-my_filter = ProfanityFilter(languages=['en', 'sp'])
 
-# Инициализация с использованием всех доступных языков
-my_filter_all = ProfanityFilter(all_languages=True)
+async def main() -> None:
+    # Инициализация с использованием английского и испанского языков
+    _filter = ProfanityFilter()
+    await _filter.init(["en", "sp"])
+
+    # Инициализация с использованием всех доступных языков
+    await _filter.init()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### Методы
@@ -74,7 +84,7 @@ my_filter_all = ProfanityFilter(all_languages=True)
 ##### Пример
 
 ```python
-language_files = my_filter.initialize_language_files()
+language_files = await _filter.initialize_language_files()
 print(language_files)
 ```
 
@@ -89,23 +99,8 @@ print(language_files)
 ##### Пример
 
 ```python
-bad_words = my_filter.initialize_bad_words()
+bad_words = await _filter.initialize_bad_words()
 print(bad_words)
-```
-
-#### `compile_patterns()`
-
-Компиляция регулярных выражений для слов нецензурной лексики.
-
-##### Возвращаемое значение
-
-- Словарь, который сопоставляет имена языков с компилированными регулярными выражениями.
-
-##### Пример
-
-```python
-patterns = my_filter.compile_patterns()
-print(patterns)
 ```
 
 #### `add_words(words: List[str])`
@@ -119,7 +114,7 @@ print(patterns)
 ##### Пример
 
 ```python
-my_filter.add_words(['customword1', 'customword2'])
+await _filter.add_words(["customword1", "customword2"])
 ```
 
 #### `similar(a: str, b: str)`
@@ -153,11 +148,11 @@ my_filter.add_words(['customword1', 'customword2'])
 
 ```python
 # Проверка на наличие нецензурной лексики
-contains_profanity = my_filter.filter_text('This is some bad text', match_threshold=0.9)
+contains_profanity = await _filter.filter_text("This is some bad text", match_threshold=0.9)
 print(contains_profanity)  # True или False
 
 # Проверка на наличие нецензурной лексики с заменой
-filtered_text = my_filter.filter_text('This is some bad text', replace_character='*')
+filtered_text = await _filter.filter_text("This is some bad text", replace_character="*")
 print(filtered_text)  # Текст с заменёнными непристойными словами
 ```
 
@@ -172,8 +167,8 @@ print(filtered_text)  # Текст с заменёнными непристой�
 ##### Пример
 
 ```python
-all_languages = my_filter.get_all_languages()
-print(all_languages)  # ['en', 'sp', 'fr', 'de', ...]
+all_languages = await _filter.get_all_languages()
+print(all_languages)  # ["en", "sp", "fr", "de", ...]
 ```
 
 ## Поддерживаемые языки
@@ -209,16 +204,26 @@ print(all_languages)  # ['en', 'sp', 'fr', 'de', ...]
 ## Полный пример использования
 
 ```python
+import asyncio
+
 from badwords import ProfanityFilter
 
-# Создаем экземпляр фильтра, указывая нужные языки
-my_filter = ProfanityFilter(languages=['en', 'sp'])
+
+async def main() -> None:
+    # Создаем экземпляр фильтра, указывая нужные языки
+    _filter = ProfanityFilter()
+    await _filter.init(["en", "sp"])
+
+    text ="Text with inappropriate words"
+
+    await check_profanity(_filter, text)
+    await check_profanity_with_replace(_filter, text)
 
 # Функция для проверки текста на наличие нецензурной лексики
-def check_profanity(text: str):
-    result = my_filter.filter_text(
+async def check_profanity(_filter: ProfanityFilter, text: str) -> None:
+    result = await _filter.filter_text(
         text=text,
-        match_threshold=0.9
+        match_threshold=0.9,
     )
 
     if result:
@@ -227,16 +232,15 @@ def check_profanity(text: str):
         print("Этот текст не содержит нецензурной лексики.")
 
 # Функция для проверки текста на наличие нецензурной лексики с заменой
-def check_profanity_with_replace(text: str):
-    result = my_filter.filter_text(
+async def check_profanity_with_replace(_filter: ProfanityFilter, text: str) -> str:
+    result = await _filter.filter_text(
         text=text,
         match_threshold=0.8,
-        replace_character="*"
+        replace_character="*",
     )
 
     print(result)
 
 if __name__ == "__main__":
-    check_profanity("Text with inappropriate words")
-    check_profanity_with_replace("Text with inappropriate words")
+    asyncio.run(main())
 ```

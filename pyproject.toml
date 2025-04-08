@@ -1,0 +1,31 @@
+[project]
+name = "badwords"
+version = "2.0.0"
+requires-python = ">=3.13"
+authors = [
+  {name = "iamlostshe", email = "vanamelcikov7275@gmail.com"},
+  {name = "FlacSy", email = "flacsy.x@gmail.com"},
+]
+description = "This is a library for effective moderation of content."
+readme = "README.md"
+license = "MIT"
+keywords = [
+  "moderation",
+  "content filtering",
+  "obscenity detection",
+  "mood analysis",
+  "image moderation"
+]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/FlacSy/badwords"
+Repository = "https://github.com/FlacSy/badwords.git"
+Issues = "https://github.com/FlacSy/badwords/issues"
+
+[tool.ruff]
+select = ["ALL"]
