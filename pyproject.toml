@@ -1,14 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "badwords"
-version = "2.0.0"
-requires-python = ">=3.13"
+version = "2.1.0"
+requires-python = ">=3.10"
 authors = [
   {name = "iamlostshe", email = "vanamelcikov7275@gmail.com"},
   {name = "FlacSy", email = "flacsy.x@gmail.com"},
 ]
 description = "This is a library for effective moderation of content."
 readme = "README.md"
-license = "MIT"
+license = {text = "MIT"}
 keywords = [
   "moderation",
   "content filtering",
@@ -18,8 +22,14 @@ keywords = [
 ]
 classifiers = [
   "Programming Language :: Python :: 3",
-  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Operating System :: OS Independent",
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Developers",
+  "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
 [project.urls]
@@ -29,3 +39,10 @@ Issues = "https://github.com/FlacSy/badwords/issues"
 
 [tool.ruff]
 select = ["ALL"]
+
+[tool.setuptools.package-data]
+badwords = ["resource/**/*"]
+
+[tool.setuptools]
+zip-safe = false
+include-package-data = true
