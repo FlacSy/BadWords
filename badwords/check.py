@@ -18,16 +18,30 @@ else:
 class ProfanityFilter:
     """A class for filtering profanity from text."""
 
-    def init(self: Self,
-            languages: list[str] | None = None,
-        ) -> None:
+    def init(
+        self: Self,
+        languages: list[str] | None = None,
+        processing_normalize_text: bool = True,
+        processing_aggressive_normalize: bool = True,
+        processing_transliterate: bool = True,
+        processing_replace_homoglyphs: bool = True,
+    ) -> None:
         """Initialize the profanity filter.
 
         :param languages: List of languages to load profanity words for.
-        :param all_languages: Flag to load profanity words for all available languages.
+        :param processing_normalize_text: Enable text normalization for all loaded words and word to filter
+        :param processing_aggressive_normalize: Enable aggressive text normalization for all loaded words and word to filter
+        :param processing_transliterate: Enable transliteration of text for all loaded words and word to filter
+        :param processing_replace_homoglyphs: Enable replacing of homoglyphs in the text for all loaded words and word to filter
         """
         self.resource_dir = Path(__file__).parent / "resource"
-        self.text_processor = TextProcessor()
+
+        self.text_processor = TextProcessor(
+            processing_normalize_text=processing_normalize_text,
+            processing_aggressive_normalize=processing_aggressive_normalize,
+            processing_transliterate=processing_transliterate,
+            processing_replace_homoglyphs=processing_replace_homoglyphs
+        )
 
         self.language_files = self.initialize_language_files()
 

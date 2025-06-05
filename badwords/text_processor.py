@@ -11,15 +11,34 @@ from typing import Dict, Set
 class TextProcessor:
     """A class for advanced text processing and normalization."""
 
-    def __init__(self) -> None:
+    def __init__(
+            self,
+            processing_normalize_text: bool = True,
+            processing_aggressive_normalize: bool = True,
+            processing_transliterate: bool = True,
+            processing_replace_homoglyphs: bool = True,
+    ) -> None:
         """Initialize the text processor."""
+        self.processing_normalize_text = processing_normalize_text
+        self.processing_aggressive_normalize = processing_aggressive_normalize
+        self.processing_transliterate = processing_transliterate
+        self.processing_replace_homoglyphs = processing_replace_homoglyphs
+
         self.resource_dir = Path(__file__).parent / 'resource'
         self.unicode_mappings = self._load_unicode_mappings()
-        self.homoglyphs = self._load_homoglyphs()
+
+        if self.processing_replace_homoglyphs == True:
+            self.homoglyphs = self._load_homoglyphs()
+
         self.character_frequency = self._load_character_frequency()
-        self.cyrillic_to_latin = self._load_transliteration()
-        self.latin_to_cyrillic = {v: k for k, v in self.cyrillic_to_latin.items()}
-        self._build_homoglyph_map()
+
+        if self.processing_transliterate == True:
+            self.cyrillic_to_latin = self._load_transliteration()
+            self.latin_to_cyrillic = {v: k for k, v in self.cyrillic_to_latin.items()}
+
+        if self.processing_replace_homoglyphs == True:
+            self._build_homoglyph_map()
+
         self._build_frequency_map()
 
     def _load_unicode_mappings(self) -> Dict[str, str]:
@@ -170,10 +189,19 @@ class TextProcessor:
         Returns:
             Fully processed text.
         """
-        text = self.normalize_text(text)
-        text = self.aggressive_normalize(text)
-        text = self.transliterate(text, to_latin=True)
-        text = self.transliterate(text, to_latin=False)
-        text = self.replace_homoglyphs(text)
-        
-        return text 
+
+        txt = text
+        if self.processing_normalize_text == True:
+            txt = self.normalize_text(txt)
+
+        if self.processing_aggressive_normalize == True:
+            txt = self.aggressive_normalize(txt)
+
+        if self.processing_transliterate == True:
+            txt = self.transliterate(txt, to_latin=True)
+            txt = self.transliterate(txt, to_latin=False)
+
+        if self.processing_replace_homoglyphs == True:
+            txt = self.replace_homoglyphs(txt)
+
+        return txt
