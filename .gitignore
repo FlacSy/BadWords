@@ -8,3 +8,5 @@ __pycache__/
 dist
 *.egg-info
 .idea
+t.py
+test.py
