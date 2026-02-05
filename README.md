@@ -1,303 +1,177 @@
-# Bad Words
+<div align="center">
 
-## Оглавление
+  # 🚫 BadWords
 
-1. [Описание](#описание)
-2. [Установка](#установка)
-   - [Требования](#требования)
-   - [Установка с GitHub](#github)
-3. [Использование](#использование)
-   - [Инициализация](#инициализация)
-   - [Примеры использования](#примеры-использования)
-   - [Методы](#методы)
-     - [`initialize_language_files()`](#initialize_language_files)
-     - [`initialize_bad_words()`](#initialize_bad_words)
-     - [`compile_patterns()`](#compile_patterns)
-     - [`add_words()`](#add_words)
-     - [`similar()`](#similar)
-     - [`filter_text()`](#filter_text)
-     - [`get_all_languages()`](#get_all_languages)
-4. [Поддерживаемые языки](#поддерживаемые-языки)
-5. [Расширенные возможности фильтрации](#расширенные-возможности-фильтрации)
-6. [Полный пример использования](#полный-пример-использования)
+  **High-performance profanity filter for Python with multilingual support and evasion detection.**
 
-## Описание
+  [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue?style=flat-square)](https://www.python.org/)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+  [![Build Status](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)](#)
+  [![Downloads](https://img.shields.io/pypi/dm/badwords-py?style=flat-square&color=orange)](https://pypi.org/project/badwords-py/)
+  
+  [Installation](#-installation) • [Quick Start](#-quick-start) • [Supported Languages](#-supported-languages) • [Advanced Evasion Detection](#-advanced-evasion-detection)
 
-`BadWords` - это мощная библиотека для фильтрации нецензурной лексики из текста. Она поддерживает различные языки, позволяет добавлять пользовательские слова и обладает расширенными возможностями для обнаружения замаскированных нецензурных выражений.
+</div>
 
-## Установка
+---
 
-### Требования
+## 📖 Description
 
-- Рекомендуемая версия: Python 3.13
-- Минимальная версия: Python 3.10
-- Поддерживаемые версии: Python 3.10 и выше
+`BadWords` is a sophisticated profanity filtering library designed to clean up user-generated content. Unlike simple keyword matching, it uses **similarity scoring**, **homoglyph detection**, and **transliteration** to catch even the most cleverly disguised insults.
 
-### GitHub
+## 📦 Installation
 
+### Requirements
+- **Recommended:** Python 3.13
+- **Minimum:** Python 3.10+
+
+### Install via GitHub
 ```bash
-pip3 install git+https://github.com/FlacSy/badwords.git
+pip install git+[https://github.com/FlacSy/badwords.git](https://github.com/FlacSy/badwords.git)
+
 ```
 
-## Использование
+### Install via PyPI
+```bash
+pip install badwords-py
+```
 
-### Инициализация
+---
+
+## ⚡ Quick Start
+
+### Basic Initialization
 
 ```python
 from badwords import ProfanityFilter
 
+# Initialize filter
 p = ProfanityFilter()
 
-p.init(languages: List[str] | None = None)
+# Load specific languages (e.g., English and Russian)
+p.init(languages=["en", "ru"])
+
+# Or load ALL 26+ supported languages
+p.init()
+
 ```
 
-#### Параметры
+### Checking and Filtering Text
 
-- `languages` (список строк, необязательно): Список языков, для которых будут загружены слова нецензурной лексики. Если не указано, будут использованы все доступные языки.
+```python
+text = "Some very b4d text here"
 
-### Примеры использования
+# 1. Simple check (Returns Boolean)
+is_bad = p.filter_text(text)
+print(is_bad) # True
+
+# 2. Censoring text (Returns String)
+clean_text = p.filter_text(text, replace_character="*")
+print(clean_text) # "Some very *** text here"
+
+```
+
+---
+
+## 🛠 Methods & API
+
+### `filter_text(text, match_threshold=0.8, replace_character=None)`
+
+The core method of the library.
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `text` | `str` | Required | Input text to check. |
+| `match_threshold` | `float` | `0.8` | Similarity threshold (1.0 = exact match, 0.7 = aggressive). |
+| `replace_character` | `str/None` | `None` | If provided, returns censored string. If None, returns bool. |
+
+> [!WARNING]
+> **Performance Tip:** Using `match_threshold < 1.0` enables fuzzy matching which is slower. Use `1.0` for high-traffic real-time filtering, or `0.95` for a good balance.
+
+---
+
+## 🧩 Advanced Evasion Detection
+
+Standard filters are easy to bypass. `BadWords` is built to detect:
+
+* **Homoglyphs:** Detects `hеllo` (using Cyrillic 'е') or `h4llo` (numbers).
+* **Transliteration:** Automatically handles mapping between Cyrillic and Latin alphabets.
+* **Normalization:** Strips diacritics, special characters, and decorative Unicode symbols.
+* **Similarity Analysis:** Uses fuzzy matching to find words with deliberate typos.
+
+### Examples of detected evasions:
+
+```python
+_filter.filter_text("hеllо")  # Mixed alphabets (Cyrillic + Latin) -> DETECTED
+_filter.filter_text("h3ll0")  # Character substitution -> DETECTED
+_filter.filter_text("h⍺llo")  # Mathematical/Greek symbols -> DETECTED
+_filter.filter_text("привет") # Transliterated matches -> DETECTED
+
+```
+
+---
+
+## 🌍 Supported Languages
+
+`BadWords` currently supports **26 languages** out of the box:
+
+| Code | Language | Code | Language | Code | Language |
+| --- | --- | --- | --- | --- | --- |
+| `en` | English | `ru` | Russian | `ua` | Ukrainian |
+| `de` | German | `fr` | French | `it` | Italian |
+| `sp` | Spanish | `pl` | Polish | `cz` | Czech |
+| `ja` | Japanese | `ko` | Korean | `th` | Thai |
+| ... | & 14 more |  |  |  |  |
+
+*Use `p.get_all_languages()` to see the full list in your code.*
+
+---
+
+## 🚀 Full Integration Example
 
 ```python
 from badwords import ProfanityFilter
 
-
-def main() -> None:
-    # Инициализация с использованием английского и испанского языков
-    _filter = ProfanityFilter()
-    _filter.init(["en", "sp"])
-
-    # Инициализация с использованием всех доступных языков
-    _filter.init()
-
-
-if __name__ == "__main__":
-    main()
-```
-
-### Методы
-
-#### `initialize_language_files()`
-
-Инициализация файлов языков.
-
-##### Возвращаемое значение
-
-- Словарь, который сопоставляет имена языков с путями к файлам.
-
-##### Пример
-
-```python
-language_files = _filter.initialize_language_files()
-print(language_files)
-```
-
-#### `initialize_bad_words()`
-
-Инициализация слов нецензурной лексики для каждого языка.
-
-##### Возвращаемое значение
-
-- Словарь, который сопоставляет имена языков с наборами слов нецензурной лексики.
-
-##### Пример
-
-```python
-bad_words = _filter.initialize_bad_words()
-print(bad_words)
-```
-
-#### `add_words(words: List[str])`
-
-Добавление пользовательских слов нецензурной лексики в фильтр.
-
-##### Параметры
-
-- `words` (список строк): Список пользовательских слов нецензурной лексики.
-
-##### Пример
-
-```python
-_filter.add_words(["customword1", "customword2"])
-```
-
-#### `similar(a: str, b: str)`
-
-Вычисление коэффициента сходства между двумя строками.
-
-##### Параметры
-
-- `a` (строка): Первая строка.
-- `b` (строка): Вторая строка.
-
-##### Возвращаемое значение
-
-- Коэффициент сходства (дробное число).
-
-#### `filter_text(text: str, match_threshold: float = 0.8, replace_character=None)`
-
-Проверка, содержит ли заданный текст нецензурную лексику.
-
-##### Параметры
-
-- `text` (строка): Входной текст для проверки.
-- `match_threshold` (дробное число, необязательно): Порог для совпадения по схожести. По умолчанию `0.8`.
-  - Значение от 0.0 до 1.0, где 1.0 означает точное совпадение
-  - Более низкие значения увеличивают количество найденных совпадений, но значительно замедляют работу
-  - Рекомендуемые значения: 0.9-0.95 для баланса между точностью и производительностью
-  - При значении 1.0 проверка работает максимально быстро
-- `replace_character` (символ или None, необязательно): Символ для замены непристойных слов. Если None, возвращает True/False. По умолчанию `None`.
-
-
-**Важно**: Использование similarity matching (match_threshold < 1.0) значительно замедляет работу фильтра. Рекомендуется:
-- Использовать базовую проверку (match_threshold=1.0) для быстрой фильтрации
-- Включать similarity matching только когда нужна более строгая проверка
-- Использовать более высокие значения match_threshold (0.95) для лучшей производительности
-
-##### Возвращаемое значение
-
-- `True` если найдена нецензурная лексика, `False` в противном случае. Если `replace_character` указан, возвращает отфильтрованный текст.
-
-##### Пример
-
-```python
-# Проверка на наличие нецензурной лексики
-contains_profanity = _filter.filter_text("This is some bad text", match_threshold=0.9)
-print(contains_profanity)  # True или False
-
-# Проверка на наличие нецензурной лексики с заменой
-filtered_text = _filter.filter_text("This is some bad text", replace_character="*")
-print(filtered_text)  # Текст с заменёнными непристойными словами
-```
-
-### `get_all_languages()`
-
-Получение списка всех доступных языков.
-
-#### Возвращаемое значение
-
-- Список строк, содержащий коды всех поддерживаемых языков.
-
-##### Пример
-
-```python
-all_languages = _filter.get_all_languages()
-print(all_languages)  # ["en", "sp", "fr", "de", ...]
-```
-
-## Поддерживаемые языки
-
-В настоящее время `BadWords` поддерживает 26 языков:
-
-- `br` - Португальский (Бразилия)
-- `cz` - Чешский
-- `da` - Датский
-- `de` - Немецкий
-- `du` - Голландский
-- `en` - Английский
-- `fi` - Финский
-- `fr` - Французский
-- `gr` - Греческий
-- `hu` - Венгерский
-- `in` - Индонезийский
-- `it` - Итальянский
-- `ja` - Японский
-- `ko` - Корейский
-- `lt` - Литовский
-- `no` - Норвежский
-- `pl` - Польский
-- `po` - Португальский (Европейский)
-- `ro` - Румынский
-- `ru` - Русский
-- `sp` - Испанский
-- `sw` - Шведский
-- `th` - Тайский
-- `tu` - Турецкий
-- `ua` - Украинский
-
-## Расширенные возможности фильтрации
-
-`BadWords` обладает мощными возможностями для обнаружения замаскированных нецензурных выражений:
-
-### Транслитерация
-- Автоматическое преобразование между кириллицей и латиницей
-- Обнаружение слов, написанных в разных алфавитах
-- Поддержка сложных случаев транслитерации
-
-### Нормализация текста
-- Приведение к нижнему регистру
-- Удаление диакритических знаков
-- Удаление специальных символов и знаков препинания
-- Агрессивная нормализация для удаления нестандартных символов
-
-### Обнаружение гомоглифов
-- Выявление символов, визуально похожих на буквы
-- Замена декоративных и математических символов
-- Обработка Unicode-символов с похожим начертанием
-
-### Частотный анализ
-- Учет наиболее распространенных способов обхода фильтрации
-- Адаптивная система подстановки символов
-- Обучение на основе частоты использования различных замен
-
-### Многослойная фильтрация
-- Последовательное применение различных методов фильтрации
-- Комбинирование результатов разных уровней проверки
-- Повышенная точность обнаружения замаскированных слов
-
-### Примеры работы с замаскированными словами
-
-```python
-# Обнаружение слов с использованием разных алфавитов
-_filter.filter_text("hеllо")  # Обнаружит "hello" с кириллической 'е'
-
-# Обнаружение слов с заменой символов
-_filter.filter_text("h3ll0")  # Обнаружит "hello" с заменой букв на цифры
-
-# Обнаружение слов с использованием гомоглифов
-_filter.filter_text("h⍺llo")  # Обнаружит "hello" с использованием альтернативных символов
-
-# Обнаружение слов с транслитерацией
-_filter.filter_text("привет")  # Обнаружит "privet" в латинице
-```
-
-## Полный пример использования
-
-```python
-from badwords import ProfanityFilter
-
-
-def main() -> None:
-    # Создаем экземпляр фильтра, указывая нужные языки
-    _filter = ProfanityFilter()
-    _filter.init(["en", "sp"])
-
-    text ="Text with inappropriate words"
-
-    check_profanity(_filter, text)
-    check_profanity_with_replace(_filter, text)
-
-# Функция для проверки текста на наличие нецензурной лексики
-def check_profanity(_filter: ProfanityFilter, text: str) -> None:
-    result = _filter.filter_text(
-        text=text,
-        match_threshold=0.9,
-    )
-
-    if result:
-        print("Этот текст содержит нецензурную лексику.")
+def monitor_chat():
+    # Setup for a global chat
+    profanity_filter = ProfanityFilter()
+    profanity_filter.init(["en", "ru", "de"])
+    
+    # Custom project-specific banned words
+    profanity_filter.add_words(["spam_link_v1", "scam_bot_99"])
+
+    user_input = "Hey! Check out this b.a.d.w.o.r.d"
+    
+    # Moderate with high accuracy
+    is_offensive = profanity_filter.filter_text(user_input, match_threshold=0.95)
+    
+    if is_offensive:
+        print("Message blocked: Contains restricted language.")
     else:
-        print("Этот текст не содержит нецензурной лексики.")
-
-# Функция для проверки текста на наличие нецензурной лексики с заменой
-def check_profanity_with_replace(_filter: ProfanityFilter, text: str) -> str:
-    result = _filter.filter_text(
-        text=text,
-        match_threshold=0.8,
-        replace_character="*",
-    )
-
-    print(result)
+        # Proceed with processing
+        pass
 
 if __name__ == "__main__":
-    main()
+    monitor_chat()
+
 ```
+
+---
+
+## 🤝 Contributing
+
+Contributions are what make the open-source community an amazing place to learn, inspire, and create.
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📄 License
+
+Distributed under the MIT License. See `LICENSE` for more information.
+
+<div align="center">
+<sub>Developed with ❤️ by <a href="https://github.com/FlacSy">FlacSy</a></sub>
+</div>
