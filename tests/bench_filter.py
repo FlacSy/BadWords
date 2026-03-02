@@ -15,13 +15,17 @@ def filter_en_ru() -> ProfanityFilter:
 
 
 @pytest.mark.benchmark
-def test_bench_filter_clean(benchmark: pytest.BenchmarkFixture, filter_en_ru: ProfanityFilter) -> None:
+def test_bench_filter_clean(
+    benchmark: pytest.BenchmarkFixture, filter_en_ru: ProfanityFilter
+) -> None:
     """Benchmark: clean text (no profanity)."""
     benchmark(filter_en_ru.filter_text, "Hello, this is a clean message for testing.")
 
 
 @pytest.mark.benchmark
-def test_bench_filter_bad(benchmark: pytest.BenchmarkFixture, filter_en_ru: ProfanityFilter) -> None:
+def test_bench_filter_bad(
+    benchmark: pytest.BenchmarkFixture, filter_en_ru: ProfanityFilter
+) -> None:
     """Benchmark: text with profanity."""
     benchmark(filter_en_ru.filter_text, "sonofabitch")
 
@@ -47,7 +51,9 @@ def test_bench_filter_censor(
 
 
 @pytest.mark.benchmark
-def test_bench_filter_many(benchmark: pytest.BenchmarkFixture, filter_en_ru: ProfanityFilter) -> None:
+def test_bench_filter_many(
+    benchmark: pytest.BenchmarkFixture, filter_en_ru: ProfanityFilter
+) -> None:
     """Benchmark: multiple texts in sequence."""
     texts = [
         "Hello world",

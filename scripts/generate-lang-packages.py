@@ -23,7 +23,9 @@ def main() -> None:
             if line.strip()
         ]
         out = lang_dir / f"{lang}.json"
-        out.write_text(json.dumps(lines, ensure_ascii=False, indent=0), encoding="utf-8")
+        out.write_text(
+            json.dumps(lines, ensure_ascii=False, indent=0), encoding="utf-8"
+        )
         exports[f"./{lang}"] = f"./lang/{lang}.json"
 
     # index.js re-exports all for convenience
@@ -81,7 +83,9 @@ filter.isBad('some text');  // uses en+ru (built-in) + de + ua
 ## Available languages
 
 """
-    lang_keys = sorted(k.replace("./", "") for k in exports if k not in (".", "./package.json"))
+    lang_keys = sorted(
+        k.replace("./", "") for k in exports if k not in (".", "./package.json")
+    )
     readme += ", ".join(lang_keys)
     readme += "\n"
     (PKG_DIR / "README.md").write_text(readme, encoding="utf-8")
