@@ -28,7 +28,7 @@ docker run --rm -v $(pwd):/io ghcr.io/pyo3/maturin build --release -o dist
 twine upload dist/badwords_py-*.whl
 ```
 
-Or use GitHub Actions: `maturin generate-ci github > .github/workflows/CI.yml`
+Or use GitHub Actions: `.github/workflows/release.yml` publishes to PyPI on release.
 
 ### crates.io (badwords-core)
 ```bash
