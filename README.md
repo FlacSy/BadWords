@@ -2,14 +2,30 @@
 
 # 🚫 BadWords
 
-**High-performance profanity filter for Python with multilingual support and evasion detection.**
+**High-performance profanity filter for Python, Rust, and JavaScript (WebAssembly)  
+with multilingual support and evasion detection.**
 
-[![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue?style=flat-square)](https://www.python.org/)
+---
+
+[![Tests](https://github.com/FlacSy/badwords/actions/workflows/tests.yml/badge.svg?style=flat-square)](https://github.com/FlacSy/badwords/actions/workflows/tests.yml)
+[![Format](https://github.com/FlacSy/badwords/actions/workflows/format.yml/badge.svg?style=flat-square)](https://github.com/FlacSy/badwords/actions/workflows/format.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)](#)
+[![Documentation](https://img.shields.io/badge/docs-badwords.flacsy.dev-0D9488?style=flat-square)](https://badwords.flacsy.dev)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey?style=flat-square)]()
 
-[![Downloads (badwords-py)](https://static.pepy.tech/personalized-badge/badwords-py?period=total&units=international_system&left_color=black&right_color=green&left_text=badwords-py)](https://pepy.tech/projects/badwords-py)
-[![Downloads (legacy bdw)](https://static.pepy.tech/personalized-badge/bdw?period=total&units=international_system&left_color=black&right_color=gray&left_text=bdw%20(legacy))](https://pepy.tech/projects/bdw)
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-3D7A3D?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![Rust](https://img.shields.io/badge/rust-1.70+-orange?style=flat-square)](https://www.rust-lang.org/)
+[![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-yellow?style=flat-square&logo=javascript)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+
+[![PyPI](https://img.shields.io/pypi/v/badwords-py?style=flat-square&color=FFD43B)](https://pypi.org/project/badwords-py/)
+[![npm (badwords-wasm)](https://img.shields.io/npm/v/badwords-wasm?style=flat-square&color=CB3837)](https://www.npmjs.com/package/badwords-wasm)
+[![npm (@badwords/languages)](https://img.shields.io/npm/v/@badwords/languages?style=flat-square&color=CB3837)](https://www.npmjs.com/package/@badwords/languages)
+[![crates.io](https://img.shields.io/crates/v/badwords-core?style=flat-square&color=F74C00)](https://crates.io/crates/badwords-core)
+[![badwords-py](https://static.pepy.tech/personalized-badge/badwords-py?period=total&units=international_system&left_color=black&right_color=green&left_text=badwords-py)](https://pepy.tech/projects/badwords-py)
+[![bdw (legacy)](https://static.pepy.tech/personalized-badge/bdw?period=total&units=international_system&left_color=black&right_color=gray&left_text=bdw)](https://pepy.tech/projects/bdw)
+
+---
 
 [Installation](#-installation) •
 [Quick Start](#-quick-start) •
@@ -18,7 +34,6 @@
 [Documentation](https://badwords.flacsy.dev)
 
 </div>
-
 ---
 
 ## 📖 Description
