@@ -1,0 +1,17 @@
+[package]
+name = "badwords-py"
+version = "2.2.0"
+edition = "2021"
+description = "Python bindings for badwords profanity filter"
+license = "MIT"
+repository = "https://github.com/FlacSy/badwords"
+homepage = "https://badwords.flacsy.dev"
+authors = ["FlacSy <flacsy.x@gmail.com>", "iamlostshe <vanamelcikov7275@gmail.com>"]
+
+[lib]
+name = "_native"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+badwords-core = { path = "../badwords-core" }
+pyo3 = { version = "0.22", features = ["extension-module"] }

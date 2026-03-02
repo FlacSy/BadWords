@@ -14,7 +14,8 @@
 [Installation](#-installation) •
 [Quick Start](#-quick-start) •
 [Supported Languages](#-supported-languages) •
-[Advanced Evasion Detection](#-advanced-evasion-detection)
+[Evasion Detection](#-advanced-evasion-detection) •
+[Documentation](https://badwords.flacsy.dev)
 
 </div>
 
@@ -23,6 +24,8 @@
 ## 📖 Description
 
 `BadWords` is a sophisticated profanity filtering library designed to clean up user-generated content. Unlike simple keyword matching, it uses **similarity scoring**, **homoglyph detection**, and **transliteration** to catch even the most cleverly disguised insults.
+
+**Architecture:** The core is implemented in Rust for performance. Python provides a thin API layer with full type hints for IDE/linter support. The Rust library can also be used directly from Rust projects.
 
 ## 📦 Installation
 
@@ -80,14 +83,14 @@ print(clean_text) # "Some very *** text here"
 
 ## 🛠 Methods & API
 
-### `filter_text(text, match_threshold=0.8, replace_character=None)`
+### `filter_text(text, match_threshold=1.0, replace_character=None)`
 
 The core method of the library.
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
 | `text` | `str` | Required | Input text to check. |
-| `match_threshold` | `float` | `0.8` | Similarity threshold (1.0 = exact match, 0.7 = aggressive). |
+| `match_threshold` | `float` | `1.0` | Similarity threshold (1.0 = exact match, 0.95 = fuzzy). |
 | `replace_character` | `str/None` | `None` | If provided, returns censored string. If None, returns bool. |
 
 > [!WARNING]
@@ -118,17 +121,21 @@ _filter.filter_text("привет") # Transliterated matches -> DETECTED
 
 ## 🌍 Supported Languages
 
-`BadWords` currently supports **26 languages** out of the box:
+`BadWords` supports **25 languages** out of the box:
 
 | Code | Language | Code | Language | Code | Language |
-| --- | --- | --- | --- | --- | --- |
+|------|----------|------|----------|------|----------|
 | `en` | English | `ru` | Russian | `ua` | Ukrainian |
 | `de` | German | `fr` | French | `it` | Italian |
 | `sp` | Spanish | `pl` | Polish | `cz` | Czech |
 | `ja` | Japanese | `ko` | Korean | `th` | Thai |
-| ... | & 14 more |  |  |  |  |
+| `br` | Portuguese (BR) | `da` | Danish | `du` | Dutch |
+| `fi` | Finnish | `gr` | Greek | `hu` | Hungarian |
+| `in` | Indonesian | `lt` | Lithuanian | `no` | Norwegian |
+| `po` | Portuguese | `ro` | Romanian | `sw` | Swedish |
+| `tu` | Turkish | | | | |
 
-*Use `p.get_all_languages()` to see the full list in your code.*
+*Use `p.get_all_languages()` in code. Full list with word counts: [badwords.flacsy.dev](https://badwords.flacsy.dev/reference/languages/)*
 
 ---
 
@@ -162,6 +169,115 @@ if __name__ == "__main__":
 ```
 
 ---
+
+## 🦀 Rust API (badwords-core)
+
+Published on [crates.io](https://crates.io/crates/badwords-core):
+
+```toml
+[dependencies]
+badwords-core = "2"
+```
+
+```rust
+use badwords_core::{ProfanityFilter, default_resource_dir};
+
+let resource_dir = default_resource_dir();
+let mut filter = ProfanityFilter::new(&resource_dir, true, true, true, true);
+filter.init(None).unwrap();
+filter.add_words(&["custom".to_string()]);
+let (found, _) = filter.filter_text("hello", 1.0, None);
+```
+
+## 🌐 WebAssembly (JavaScript/TypeScript)
+
+Same Rust code for browser and Node.js, compiled to WASM.
+
+### Build
+
+```bash
+# Browser
+make wasm
+
+# Node.js
+make wasm-nodejs
+```
+
+### Frontend (browser)
+
+```html
+<script type="module">
+  import init, { ProfanityFilter } from './path/to/badwords_wasm.js';
+  await init();
+  const filter = new ProfanityFilter();
+  console.log(filter.isBad('text'));      // boolean
+  console.log(filter.censor('text', '*')); // string
+</script>
+```
+
+### Backend (Node.js)
+
+```javascript
+const { ProfanityFilter } = require('badwords-wasm');
+const filter = new ProfanityFilter();
+filter.isBad('hello');           // false
+filter.censor('bad word', '*');  // "*** word"
+filter.addWords(['custom']);
+```
+
+### Optional languages (npm)
+
+Built-in: en and ru. Additional languages via `@badwords/languages`:
+
+```bash
+npm install badwords-wasm @badwords/languages
+```
+
+```javascript
+import init, { ProfanityFilter } from 'badwords-wasm';
+import de from '@badwords/languages/de';
+import ua from '@badwords/languages/ua';
+
+await init();
+const filter = new ProfanityFilter();
+filter.addWords(de);
+filter.addWords(ua);
+```
+
+Available: br, cz, da, de, du, en, fi, fr, gr, hu, in, it, ja, ko, lt, no, pl, po, ro, ru, sp, sw, th, tu, ua. See [@badwords/languages](https://www.npmjs.com/package/@badwords/languages).
+
+Examples: `examples/wasm/browser/`, `examples/wasm/node/`
+
+## 🔧 Building from source
+
+Requires: Rust, Python, maturin
+
+```bash
+python -m venv .venv && source .venv/bin/activate  # Linux/macOS
+pip install maturin
+make develop
+# or: cd python && maturin build && pip install target/wheels/badwords_py-*.whl
+```
+
+## 🌐 WebAssembly (browser & Node.js)
+
+Build the WASM package (requires [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/)):
+
+```bash
+cargo install wasm-pack
+make wasm
+```
+
+Output: `rust/badwords-wasm/pkg/` (npm package `badwords-wasm`)
+
+- **Browser:** Use the generated JS with a bundler or static server. See `examples/wasm/browser/`
+- **Node.js:** `import init, { ProfanityFilter } from 'badwords-wasm'` after `npm install`. See `examples/wasm/node/`
+- **Publish to npm:** `make wasm` or `make wasm-nodejs`, then `make npm-publish`
+- **Optional languages:** `@badwords/languages` — `make lang-packages` then `make npm-publish-languages`
+
+## 📚 Documentation
+
+Full documentation (Python, Rust, JavaScript) with examples and API reference: **[badwords.flacsy.dev](https://badwords.flacsy.dev)** (EN / RU).
 
 ## 🤝 Contributing
 

@@ -1,0 +1,52 @@
+{
+  "name": "@badwords/languages",
+  "version": "2.2.0",
+  "description": "Optional language word lists for badwords-wasm",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FlacSy/badwords"
+  },
+  "homepage": "https://badwords.flacsy.dev",
+  "bugs": "https://github.com/FlacSy/badwords/issues",
+  "author": "FlacSy <flacsy.x@gmail.com>",
+  "keywords": [
+    "badwords",
+    "profanity",
+    "filter",
+    "languages"
+  ],
+  "exports": {
+    "./br": "./lang/br.json",
+    "./cz": "./lang/cz.json",
+    "./da": "./lang/da.json",
+    "./de": "./lang/de.json",
+    "./du": "./lang/du.json",
+    "./en": "./lang/en.json",
+    "./fi": "./lang/fi.json",
+    "./fr": "./lang/fr.json",
+    "./gr": "./lang/gr.json",
+    "./hu": "./lang/hu.json",
+    "./in": "./lang/in.json",
+    "./it": "./lang/it.json",
+    "./ja": "./lang/ja.json",
+    "./ko": "./lang/ko.json",
+    "./lt": "./lang/lt.json",
+    "./no": "./lang/no.json",
+    "./pl": "./lang/pl.json",
+    "./po": "./lang/po.json",
+    "./ro": "./lang/ro.json",
+    "./ru": "./lang/ru.json",
+    "./sp": "./lang/sp.json",
+    "./sw": "./lang/sw.json",
+    "./th": "./lang/th.json",
+    "./tu": "./lang/tu.json",
+    "./ua": "./lang/ua.json",
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lang",
+    "index.js"
+  ]
+}
