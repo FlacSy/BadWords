@@ -11,7 +11,7 @@ authors = [
   {name = "FlacSy", email = "flacsy.x@gmail.com"},
 ]
 description = "This is a library for effective moderation of content."
-readme = "README.md"
+readme = "../README.md"
 license = {text = "MIT"}
 keywords = [
   "moderation",
@@ -35,21 +35,19 @@ classifiers = [
 dev = ["pytest>=7.0", "pytest-benchmark>=4.0"]
 
 [project.urls]
-Homepage = "https://badwords.flacsy.dev"
-Documentation = "https://badwords.flacsy.dev"
-Repository = "https://github.com/FlacSy/badwords"
+Homepage = "https://github.com/FlacSy/badwords"
+Repository = "https://github.com/FlacSy/badwords.git"
 Issues = "https://github.com/FlacSy/badwords/issues"
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-markers = ["benchmark: run benchmarks (deselect with '-m \"not benchmark\"')"]
+testpaths = ["../tests"]
 
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = ["D203", "D213", "COM812"]
 
 [tool.maturin]
-manifest-path = "rust/badwords-py/Cargo.toml"
-python-source = "python"
+manifest-path = "../rust/badwords-py/Cargo.toml"
+python-source = "."
 python-packages = ["badwords"]
 module-name = "badwords._native"
