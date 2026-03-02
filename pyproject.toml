@@ -44,8 +44,9 @@ Issues = "https://github.com/FlacSy/badwords/issues"
 testpaths = ["tests"]
 markers = ["benchmark: run benchmarks (deselect with '-m \"not benchmark\"')"]
 
-[tool.ruff]
+[tool.ruff.lint]
 select = ["ALL"]
+ignore = ["D203", "D213", "COM812"]
 
 [tool.maturin]
 manifest-path = "rust/badwords-py/Cargo.toml"

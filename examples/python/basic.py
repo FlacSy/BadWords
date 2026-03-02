@@ -7,6 +7,7 @@ Run: python examples/python/basic.py
 
 from badwords import ProfanityFilter
 
+
 def main() -> None:
     p = ProfanityFilter()
     p.init(languages=["en", "ru"])
@@ -22,12 +23,17 @@ def main() -> None:
     print("'custombad' (custom) contains profanity:", p.filter_text("custombad"))
 
     # Censoring
-    p.init(languages=["en"], processing_transliterate=False, processing_replace_homoglyphs=False)
+    p.init(
+        languages=["en"],
+        processing_transliterate=False,
+        processing_replace_homoglyphs=False,
+    )
     p.add_words(["bad"])
     result = p.filter_text("a bad word", replace_character="*")
     print("Censored:", result)
 
     print("\nAvailable languages:", p.get_all_languages())
+
 
 if __name__ == "__main__":
     main()

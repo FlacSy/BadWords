@@ -6,6 +6,7 @@ Run: python examples/python/chat_moderation.py
 
 from badwords import ProfanityFilter
 
+
 def main() -> None:
     p = ProfanityFilter()
     p.init(languages=["en", "ru"])
@@ -22,6 +23,7 @@ def main() -> None:
         is_bad = p.filter_text(msg)
         status = "BLOCKED" if is_bad else "OK"
         print(f"[{status}] {msg}")
+
 
 if __name__ == "__main__":
     main()

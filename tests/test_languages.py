@@ -8,9 +8,31 @@ from badwords import ProfanityFilter
 
 # All languages from python/badwords/resource/words/
 LANGUAGES = [
-    "br", "cz", "da", "de", "du", "en", "fi", "fr", "gr", "hu",
-    "in", "it", "ja", "ko", "lt", "no", "pl", "po", "ro", "ru",
-    "sp", "sw", "th", "tu", "ua",
+    "br",
+    "cz",
+    "da",
+    "de",
+    "du",
+    "en",
+    "fi",
+    "fr",
+    "gr",
+    "hu",
+    "in",
+    "it",
+    "ja",
+    "ko",
+    "lt",
+    "no",
+    "pl",
+    "po",
+    "ro",
+    "ru",
+    "sp",
+    "sw",
+    "th",
+    "tu",
+    "ua",
 ]
 
 

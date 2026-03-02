@@ -41,17 +41,21 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Create venv
+        run: python -m venv .venv
+
       - name: Install dependencies
         run: |
+          source .venv/bin/activate
           python -m pip install --upgrade pip
           pip install maturin
           cd python && maturin develop --release
 
       - name: Install dev dependencies
-        run: pip install pytest pytest-benchmark
+        run: source .venv/bin/activate && pip install pytest pytest-benchmark
 
       - name: Run Python tests
-        run: pytest tests/ -v -m "not benchmark"
+        run: source .venv/bin/activate && pytest tests/ -v -m "not benchmark"
 
   test-wasm:
     name: WASM tests
