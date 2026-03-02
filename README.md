@@ -1,15 +1,20 @@
 <div align="center">
 
-  # 🚫 BadWords
+# 🚫 BadWords
 
-  **High-performance profanity filter for Python with multilingual support and evasion detection.**
+**High-performance profanity filter for Python with multilingual support and evasion detection.**
 
-  [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue?style=flat-square)](https://www.python.org/)
-  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-  [![Build Status](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)](#)
-  [![Downloads](https://img.shields.io/pypi/dm/badwords-py?style=flat-square&color=orange)](https://pypi.org/project/badwords-py/)
-  
-  [Installation](#-installation) • [Quick Start](#-quick-start) • [Supported Languages](#-supported-languages) • [Advanced Evasion Detection](#-advanced-evasion-detection)
+[![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue?style=flat-square)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)](#)
+
+[![Downloads (badwords-py)](https://static.pepy.tech/personalized-badge/badwords-py?period=total&units=international_system&left_color=black&right_color=green&left_text=badwords-py)](https://pepy.tech/projects/badwords-py)
+[![Downloads (legacy bdw)](https://static.pepy.tech/personalized-badge/bdw?period=total&units=international_system&left_color=black&right_color=gray&left_text=bdw%20(legacy))](https://pepy.tech/projects/bdw)
+
+[Installation](#-installation) •
+[Quick Start](#-quick-start) •
+[Supported Languages](#-supported-languages) •
+[Advanced Evasion Detection](#-advanced-evasion-detection)
 
 </div>
 
