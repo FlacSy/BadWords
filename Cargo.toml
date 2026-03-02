@@ -1,0 +1,27 @@
+[workspace]
+members = [
+    "rust/badwords-core",
+    "rust/badwords-py",
+    "rust/badwords-wasm",
+]
+
+[package]
+name = "badwords-examples"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[example]]
+name = "rust_basic"
+path = "examples/rust/rust_basic.rs"
+
+[[example]]
+name = "rust_chat_moderation"
+path = "examples/rust/rust_chat_moderation.rs"
+
+[[example]]
+name = "rust_specific_languages"
+path = "examples/rust/rust_specific_languages.rs"
+
+[dependencies]
+badwords-core = { path = "rust/badwords-core" }

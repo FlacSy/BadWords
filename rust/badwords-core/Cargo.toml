@@ -1,0 +1,29 @@
+[package]
+name = "badwords-core"
+version = "2.2.0"
+edition = "2021"
+description = "Core profanity filter logic - normalization, transliteration, homoglyphs"
+license = "MIT"
+repository = "https://github.com/FlacSy/badwords"
+homepage = "https://badwords.flacsy.dev"
+documentation = "https://badwords.flacsy.dev"
+keywords = ["profanity", "filter", "moderation", "content"]
+categories = ["text-processing"]
+authors = ["FlacSy <flacsy.x@gmail.com>", "iamlostshe <vanamelcikov7275@gmail.com>"]
+
+[lib]
+crate-type = ["rlib"]
+
+[[bench]]
+name = "filter"
+harness = false
+
+[dependencies]
+rustc-hash = "2.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+unicode-normalization = "0.1"
+strsim = "0.11"
+
+[dev-dependencies]
+criterion = "0.5"

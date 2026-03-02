@@ -1,0 +1,5 @@
+{
+  "name": "badwords-wasm-node-example",
+  "version": "1.0.0",
+  "description": "Node.js example for badwords-wasm"
+}

@@ -4,9 +4,13 @@
 __pycache__/
 .ruff_cache
 .mypy_cache
-*test*
 dist
 *.egg-info
 .idea
 t.py
 test.py
+.venv
+venv
+_native/
+python/badwords/*.so
+target/
