@@ -5,6 +5,10 @@ __pycache__/
 .ruff_cache
 .mypy_cache
 dist
+release/
+ml/data/
+ml/models/
+badwords-ml-model.zip
 *.egg-info
 .idea
 t.py

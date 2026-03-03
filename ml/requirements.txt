@@ -1,0 +1,9 @@
+# ML training pipeline
+# For GPU: pip install torch --index-url https://download.pytorch.org/whl/cu124
+datasets>=2.14.0
+transformers>=4.36.0
+accelerate>=0.26.0
+torch>=2.0.0
+optimum[onnxruntime]>=1.14.0
+pandas>=2.0.0
+scikit-learn>=1.3.0

@@ -33,6 +33,7 @@ classifiers = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "pytest-benchmark>=4.0"]
+ml = ["onnxruntime>=1.16", "optimum[onnxruntime]>=1.14", "transformers>=4.36"]
 
 [project.urls]
 Homepage = "https://badwords.flacsy.dev"

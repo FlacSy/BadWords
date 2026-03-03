@@ -29,6 +29,7 @@ with multilingual support and evasion detection.**
 
 [Installation](#-installation) •
 [Quick Start](#-quick-start) •
+[Benchmarks](#-benchmarks) •
 [Supported Languages](#-supported-languages) •
 [Evasion Detection](#-advanced-evasion-detection) •
 [Documentation](https://badwords.flacsy.dev)
@@ -93,6 +94,51 @@ clean_text = p.filter_text(text, replace_character="*")
 print(clean_text) # "Some very *** text here"
 
 ```
+
+---
+
+## ⏱ Benchmarks
+
+| CPU | GPU | RAM | OS |
+|-----|-----|-----|----|
+| x86_64 i7 Intel® Core™ i7-10700KF × 16 | NVIDIA GeForce RTX™ 3070 | 64 GB DDR4 3200MHz | Ubuntu 24.04.2 LTS | 
+
+
+Rule-based matching (en+ru, `match_threshold=1.0`). Run: `make bench`
+
+| Scenario | Rust (badwords-core) | Python (badwords-py) |
+|----------|----------------------|----------------------|
+| Clean text (no match) | ~7.6 µs (~130 K/s) | ~7.7 µs (~130 K/s) |
+| Bad word (match) | ~3.1 µs (~320 K/s) | ~2.7 µs (~370 K/s) |
+| Censor (replace) | ~2.8 µs (~360 K/s) | ~2.5 µs (~400 K/s) |
+| 5 texts batch | ~15 µs (~330 K/s) | ~16 µs (~310 K/s) |
+
+*Python uses Rust via PyO3, overhead minimal.*
+
+### vs glin-profanity
+
+Rule-based mode, en+ru. Run: `make bench-compare` (requires `pip install glin-profanity`)
+
+| Scenario | BadWords | glin-profanity |
+|----------|----------|----------------|
+| Clean text | ~7 µs (~140 K/s) | ~4.4 ms (~230/s) |
+| Bad word | ~1.3 µs (~770 K/s) | ~0.2 ms (~5 K/s) |
+| Censor | ~1.8 µs (~560 K/s) | ~1.4 ms (~700/s) |
+| 5 texts batch | ~16 µs (~310 K/s) | ~10 ms (~500/s) |
+
+*BadWords is ~100–600× faster (Rust core vs pure Python).*
+
+### ML mode
+
+`pip install glin-profanity[ml]` + `make bench-compare`. 100 iter each.
+
+| Scenario | BadWords ML (ONNX) | glin transformer |
+|----------|--------------------|-------------------|
+| Clean text (43 chars) | ~6.5 ms (~150/s) | ~27 ms (~37/s) |
+| Bad word (8 chars) | ~4.6 ms (~220/s) | ~21 ms (~47/s) |
+| 5 texts batch (82 chars) | ~24 ms (~210/s) | ~107 ms (~47/s) |
+
+*BadWords ML (XLM-RoBERTa) ~3–4× faster than glin transformer.*
 
 ---
 

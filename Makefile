@@ -1,4 +1,4 @@
-.PHONY: develop build test test-rust test-python test-wasm bench bench-rust bench-python wasm wasm-nodejs npm-publish lang-packages npm-publish-languages
+.PHONY: develop build test test-rust test-python test-wasm bench bench-rust bench-python bench-compare wasm wasm-nodejs npm-publish lang-packages npm-publish-languages
 
 develop:
 	cd python && maturin develop
@@ -26,6 +26,11 @@ test-wasm:
 
 bench: bench-rust bench-python
 
+bench-compare:
+	@echo "BadWords vs glin-profanity (requires: pip install glin-profanity)"
+	@if [ -d .venv ]; then .venv/bin/python scripts/bench_compare.py; \
+	else python3 scripts/bench_compare.py; fi
+
 bench-rust:
 	cargo bench -p badwords-core
 
@@ -49,3 +54,31 @@ lang-packages:
 
 npm-publish-languages:
 	cd js/languages && npm publish --access public
+
+# ML training (requires: pip install -r ml/requirements.txt)
+ml-prepare:
+	cd ml && python prepare_data.py --preset multilingual
+
+# Full dataset (~600k samples, ~8-10h training with xlm-roberta)
+ml-prepare-full:
+	cd ml && python prepare_data.py --preset multilingual --max-total 600000
+
+# Max dataset (no cap, ~1M+ samples, ~15-20h)
+ml-prepare-max:
+	cd ml && python prepare_data.py --preset multilingual
+
+ml-train:
+	cd ml && python train.py
+
+ml-test:
+	cd ml && python test_inference.py
+
+# Quantize model: 500MB -> ~135MB
+ml-quantize:
+	cd ml && python quantize_model.py
+
+# Package ML model for GitHub Release (upload as badwords-ml-model.zip)
+ml-package:
+	@if [ ! -f ml/models/model.onnx ]; then echo "Run ml-train and ml-quantize first"; exit 1; fi
+	(cd ml/models && zip -r ../../badwords-ml-model.zip . -x "checkpoints/*" -x "checkpoints/*/*")
+	@echo "Created badwords-ml-model.zip — upload to GitHub Release"
