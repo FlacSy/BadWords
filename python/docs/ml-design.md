@@ -73,8 +73,8 @@ Hybrid approach:
 ### Publishing model
 
 ```bash
-make ml-train ml-quantize   # train and quantize
-make ml-package             # creates dist/badwords-ml-model.zip
+make ml-train               # train model
+make ml-package             # quantize (~4x smaller) + create badwords-ml-model.zip
 ```
 
-Upload `dist/badwords-ml-model.zip` to a GitHub Release as an asset.
+Upload `badwords-ml-model.zip` to a GitHub Release as an asset.

@@ -78,7 +78,8 @@ ml-quantize:
 	cd ml && python quantize_model.py
 
 # Package ML model for GitHub Release (upload as badwords-ml-model.zip)
-ml-package:
-	@if [ ! -f ml/models/model.onnx ]; then echo "Run ml-train and ml-quantize first"; exit 1; fi
+# Quantizes model first (~4x smaller)
+ml-package: ml-quantize
+	@if [ ! -f ml/models/model.onnx ]; then echo "Run ml-train first"; exit 1; fi
 	(cd ml/models && zip -r ../../badwords-ml-model.zip . -x "checkpoints/*" -x "checkpoints/*/*")
 	@echo "Created badwords-ml-model.zip — upload to GitHub Release"

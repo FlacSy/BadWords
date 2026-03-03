@@ -16,6 +16,7 @@
 - [ ] `make build` — Python wheel builds
 - [ ] `make wasm` and `make wasm-nodejs` — WASM builds
 - [ ] `make lang-packages` — language packages generated
+- [ ] `make ml-package` — ML model (quantized) → badwords-ml-model.zip for GitHub Release
 
 ## Publishing
 
