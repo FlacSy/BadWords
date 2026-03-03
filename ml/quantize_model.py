@@ -58,7 +58,9 @@ def main() -> None:
             target.unlink()
             shutil.copy(quant_path, target)
             new_size = target.stat().st_size
-            print(f"Done: {orig_size / 1e6:.1f} MB -> {new_size / 1e6:.1f} MB ({100 * new_size / orig_size:.0f}%)")
+            print(
+                f"Done: {orig_size / 1e6:.1f} MB -> {new_size / 1e6:.1f} MB ({100 * new_size / orig_size:.0f}%)"
+            )
 
 
 if __name__ == "__main__":

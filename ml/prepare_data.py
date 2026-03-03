@@ -10,7 +10,14 @@ from pathlib import Path
 import pandas as pd
 from datasets import load_dataset
 
-TOXIC_COLUMNS = ["toxic", "severe_toxic", "obscene", "threat", "insult", "identity_hate"]
+TOXIC_COLUMNS = [
+    "toxic",
+    "severe_toxic",
+    "obscene",
+    "threat",
+    "insult",
+    "identity_hate",
+]
 TEXT_COLUMN = "comment_text"
 OUTPUT_DIR = Path(__file__).parent / "data" / "processed"
 
@@ -46,21 +53,39 @@ def load_single(
     if label_source == "paradetox":
         # toxic = 1, neutral/detox = 0
         input_col = next(
-            (c for c in [
-                "input", "source", "toxic",
-                "en_toxic_comment", "ru_toxic_comment", "toxic_sentence",
-            ] if c in df.columns),
+            (
+                c
+                for c in [
+                    "input",
+                    "source",
+                    "toxic",
+                    "en_toxic_comment",
+                    "ru_toxic_comment",
+                    "toxic_sentence",
+                ]
+                if c in df.columns
+            ),
             None,
         )
         output_col = next(
-            (c for c in [
-                "output", "target", "detox",
-                "en_neutral_comment", "ru_neutral_comment", "neutral_sentence",
-            ] if c in df.columns),
+            (
+                c
+                for c in [
+                    "output",
+                    "target",
+                    "detox",
+                    "en_neutral_comment",
+                    "ru_neutral_comment",
+                    "neutral_sentence",
+                ]
+                if c in df.columns
+            ),
             None,
         )
         if not input_col or not output_col:
-            raise ValueError(f"ParaDetox format needs toxic/neutral columns. Columns: {list(df.columns)}")
+            raise ValueError(
+                f"ParaDetox format needs toxic/neutral columns. Columns: {list(df.columns)}"
+            )
         toxic_df = df[[input_col]].rename(columns={input_col: TEXT_COLUMN})
         toxic_df["label"] = 1
         clean_df = df[[output_col]].rename(columns={output_col: TEXT_COLUMN})
@@ -68,7 +93,11 @@ def load_single(
         df = pd.concat([toxic_df, clean_df], ignore_index=True)
     else:
         text_col = text_col or next(
-            (c for c in ["comment_text", "text", "comment", "sentence", "content"] if c in df.columns),
+            (
+                c
+                for c in ["comment_text", "text", "comment", "sentence", "content"]
+                if c in df.columns
+            ),
             None,
         )
         if not text_col:
@@ -81,7 +110,9 @@ def load_single(
             # civil_comments: toxicity 0-1, threshold 0.5
             tox_col = next((c for c in ["toxicity", "toxic"] if c in df.columns), None)
             if not tox_col:
-                raise ValueError(f"Toxicity column not found. Columns: {list(df.columns)}")
+                raise ValueError(
+                    f"Toxicity column not found. Columns: {list(df.columns)}"
+                )
             df["label"] = (df[tox_col].fillna(0) >= 0.5).astype(int)
         elif label_source.startswith("toxic"):
             toxic_cols = [c for c in TOXIC_COLUMNS if c in df.columns]
@@ -132,7 +163,10 @@ def load_multilingual(max_samples_per_dataset: int | None = None) -> pd.DataFram
 
     # English + Russian + multilingual paradetox
     for name, (ds, _, src) in DATASET_PRESETS.items():
-        if name in ("paradetox", "ru_paradetox", "multilingual_paradetox") and src == "paradetox":
+        if (
+            name in ("paradetox", "ru_paradetox", "multilingual_paradetox")
+            and src == "paradetox"
+        ):
             try:
                 df = load_single(ds, src, None, max_samples_per_dataset, 3, 512)
                 dfs.append(df)
@@ -144,7 +178,9 @@ def load_multilingual(max_samples_per_dataset: int | None = None) -> pd.DataFram
     return pd.concat(dfs, ignore_index=True).drop_duplicates(subset=[TEXT_COLUMN])
 
 
-def balance(df: pd.DataFrame, ratio: float = 0.3, max_total: int | None = None) -> pd.DataFrame:
+def balance(
+    df: pd.DataFrame, ratio: float = 0.3, max_total: int | None = None
+) -> pd.DataFrame:
     """Balance classes. ratio = fraction of positive samples. max_total caps result size."""
     pos = df[df["label"] == 1]
     neg = df[df["label"] == 0]
@@ -213,7 +249,9 @@ def main() -> None:
         ds_name, text_col, label_src = DATASET_PRESETS[args.preset]
         df = load_single(ds_name, label_src, text_col, args.max_samples, 3, 512)
 
-    print(f"Total: {len(df)} samples, {df['label'].sum()} positive ({df['label'].mean():.2%})")
+    print(
+        f"Total: {len(df)} samples, {df['label'].sum()} positive ({df['label'].mean():.2%})"
+    )
 
     df_balanced = balance(df, ratio=args.positive_ratio, max_total=args.max_total)
     print(f"Balanced: {len(df_balanced)} samples")

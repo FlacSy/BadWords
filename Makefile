@@ -1,4 +1,4 @@
-.PHONY: develop build test test-rust test-python test-wasm bench bench-rust bench-python bench-compare wasm wasm-nodejs npm-publish lang-packages npm-publish-languages
+.PHONY: develop build test test-rust test-python test-wasm bench bench-rust bench-python bench-compare lint lint-fix format format-fix wasm wasm-nodejs npm-publish lang-packages npm-publish-languages
 
 develop:
 	cd python && maturin develop
@@ -37,6 +37,22 @@ bench-rust:
 bench-python:
 	@if [ -d .venv ]; then .venv/bin/python -m pytest tests/bench_filter.py -v --benchmark-only; \
 	else python3 -m pytest tests/bench_filter.py -v --benchmark-only; fi
+
+# Ruff: lint (check only)
+lint:
+	@if [ -d .venv ]; then .venv/bin/ruff check .; else ruff check .; fi
+
+# Ruff: format check (CI)
+format:
+	@if [ -d .venv ]; then .venv/bin/ruff format --check .; else ruff format --check .; fi
+
+# Ruff: format fix (apply formatting)
+format-fix:
+	@if [ -d .venv ]; then .venv/bin/ruff format .; else ruff format .; fi
+
+# Ruff: lint with auto-fix
+lint-fix:
+	@if [ -d .venv ]; then .venv/bin/ruff check . --fix; else ruff check . --fix; fi
 
 # WebAssembly build for browser
 wasm:

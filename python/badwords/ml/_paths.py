@@ -62,13 +62,19 @@ def _download_model(cache_dir: Path) -> None:
     zip_path = cache_dir / ASSET_NAME
 
     # Get latest release
-    api_url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
-    req = urllib.request.Request(api_url, headers={"Accept": "application/vnd.github+json"})
+    api_url = (
+        f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
+    )
+    req = urllib.request.Request(
+        api_url, headers={"Accept": "application/vnd.github+json"}
+    )
     with urllib.request.urlopen(req, timeout=30) as r:
         release = json.loads(r.read().decode())
 
     # Find asset
-    asset = next((a for a in release.get("assets", []) if a["name"] == ASSET_NAME), None)
+    asset = next(
+        (a for a in release.get("assets", []) if a["name"] == ASSET_NAME), None
+    )
     if not asset:
         raise FileNotFoundError(
             f"Asset {ASSET_NAME} not found in release {release.get('tag_name', '?')}. "
