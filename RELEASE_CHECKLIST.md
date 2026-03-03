@@ -1,6 +1,6 @@
 # Release Checklist
 
-## Versions (2.2.0)
+## Versions (2.3.1)
 
 | Package | File | Publication |
 |---------|------|-------------|
