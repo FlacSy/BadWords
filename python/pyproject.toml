@@ -32,7 +32,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0", "pytest-benchmark>=4.0"]
+dev = ["pytest>=7.0", "pytest-benchmark>=4.0", "ruff>=0.4"]
 ml = ["onnxruntime>=1.16", "optimum[onnxruntime]>=1.14", "transformers>=4.36"]
 
 [project.urls]

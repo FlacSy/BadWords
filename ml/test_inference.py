@@ -13,7 +13,6 @@ MODELS_DIR = Path(__file__).parent / "models"
 
 # Expected: 1=toxic, 0=clean
 TEST_CASES = [
-
     ("Поздравзяю теперь ты не тупой", 1),
 ]
 
@@ -29,9 +28,7 @@ def predict(model, tokenizer, text: str) -> float:
 def main() -> None:
     print("Loading model...")
     model = ORTModelForSequenceClassification.from_pretrained(str(MODELS_DIR))
-    tokenizer = AutoTokenizer.from_pretrained(
-        str(MODELS_DIR), fix_mistral_regex=True
-    )
+    tokenizer = AutoTokenizer.from_pretrained(str(MODELS_DIR), fix_mistral_regex=True)
 
     print("\n" + "=" * 70)
     print("Toxicity scores (1.0 = toxic, 0.5 threshold)")
@@ -49,7 +46,9 @@ def main() -> None:
         print(f"  {prob:.3f} [{label:5}] {ok} (exp: {exp_str})  {text!r}")
 
     print("=" * 70)
-    print(f"Accuracy: {correct}/{len(TEST_CASES)} ({100 * correct / len(TEST_CASES):.0f}%)")
+    print(
+        f"Accuracy: {correct}/{len(TEST_CASES)} ({100 * correct / len(TEST_CASES):.0f}%)"
+    )
     print("Note: evasion (leetspeak, spacing), indirect RU insults often missed.")
     print("=" * 70)
 
