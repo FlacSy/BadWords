@@ -61,7 +61,7 @@ dependencies = [
 
 [[package]]
 name = "badwords-py"
-version = "2.2.0"
+version = "2.3.1"
 dependencies = [
  "badwords-core",
  "pyo3",
