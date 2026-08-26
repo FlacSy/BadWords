@@ -127,8 +127,10 @@ ml-prepare-full:
 ml-train:
 	cd ml && python train.py
 
+# ML tests live with the rest of the suite; they skip without a model
 ml-test:
-	cd ml && python test_inference.py
+	@if [ -d .venv ]; then .venv/bin/python -m pytest tests/test_ml.py -v; \
+	else python3 -m pytest tests/test_ml.py -v; fi
 
 # Quantize model: 500MB -> ~135MB
 ml-quantize:

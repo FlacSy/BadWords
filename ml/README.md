@@ -59,7 +59,7 @@ Output: `models/` (ONNX + tokenizer)
 
 ```bash
 python quantize_model.py
-# xlm-roberta: 500MB -> ~135MB
+# xlm-roberta: ~1.1 GB -> ~266 MB
 # distilbert: 250MB -> ~65MB
 ```
 
@@ -75,7 +75,7 @@ python quantize_model.py
 
 ## Model
 
-- **Default:** `xlm-roberta-base` (best quality, ~135MB after quantize)
+- **Default:** `xlm-roberta-base` (best quality, ~266 MB after quantize)
 - **Lighter:** `distilbert-base-multilingual-cased` (~65MB after quantize, faster training)
 - Task: binary classification (offensive probability)
 - Output: ONNX for inference
