@@ -1,38 +1,40 @@
-#!/usr/bin/env python3
-"""Basic usage of badwords (Python).
+"""Basic usage.
 
-Run: python examples/python/basic.py
-     or: python -m examples.python.basic (from project root)
+Run: python -m examples.python.basic
 """
 
-from badwords import ProfanityFilter
+from __future__ import annotations
+
+from badwords import Options, ProfanityFilter
 
 
 def main() -> None:
+    """Show the core API."""
     p = ProfanityFilter()
     p.init(languages=["en", "ru"])
 
-    # Check clean text
-    print("'hello world' contains profanity:", p.filter_text("hello world"))
+    print("clean text:  ", p.is_profane("hello world"))
+    print("profane text:", p.is_profane("sonofabitch"))
 
-    # Check text with profanity
-    print("'sonofabitch' contains profanity:", p.filter_text("sonofabitch"))
-
-    # Add custom words
     p.add_words(["custombad"])
-    print("'custombad' (custom) contains profanity:", p.filter_text("custombad"))
+    print("custom word: ", p.is_profane("custombad"))
 
-    # Censoring
-    p.init(
-        languages=["en"],
-        processing_transliterate=False,
-        processing_replace_homoglyphs=False,
-    )
-    p.add_words(["bad"])
-    result = p.filter_text("a bad word", replace_character="*")
-    print("Censored:", result)
+    # Censoring keeps everything that is not part of a match.
+    print("censored:    ", p.censor("hey shit, ok"))
 
-    print("\nAvailable languages:", p.get_all_languages())
+    # find() says what matched, where, and in which language.
+    for match in p.find("what a shitty, damn mess"):
+        print(
+            f"  {match.matched_text!r} at {match.start}..{match.end} "
+            f"({match.word!r}, {match.language}, {match.kind})"
+        )
+
+    # Evasion detection is opt-in, because each detector costs false positives.
+    strict = Options(split_on_punctuation=True, collapse_repeats=True, leetspeak=True)
+    for text in ["shiiit", "you.shit", "sh1t"]:
+        print(f"  {text!r:12} default={p.is_profane(text)} strict={p.is_profane(text, strict)}")
+
+    print("loaded languages:", p.loaded_languages())
 
 
 if __name__ == "__main__":

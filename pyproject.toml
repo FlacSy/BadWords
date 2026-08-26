@@ -44,13 +44,36 @@ Issues = "https://github.com/FlacSy/badwords/issues"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = ["benchmark: run benchmarks (deselect with '-m \"not benchmark\"')"]
+filterwarnings = ["error::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+extend-exclude = ["testenv", "target"]
 
 [tool.ruff.lint]
 select = ["ALL"]
-ignore = ["D203", "D213", "COM812"]
+ignore = [
+  "D203",    # conflicts with D211
+  "D213",    # conflicts with D212
+  "COM812",  # conflicts with the formatter
+  "PLR0913", # the native layer legitimately takes one argument per option
+  "RUF001",  # this is a profanity filter: confusable characters are the domain
+  "RUF002",
+  "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests assert, compare against literals and do not need public-API docstrings.
+"tests/*" = ["S101", "PLR2004", "D103", "ANN001", "ANN201", "SLF001", "INP001"]
+# Scripts and examples are run by hand and print their results.
+"scripts/*" = ["T201", "INP001", "S603", "S607"]
+"examples/*" = ["T201", "INP001", "D103"]
+# The training pipeline is a set of standalone scripts, not library code.
+"ml/*" = ["T201", "INP001", "D103", "BLE001", "PLC0415", "EXE001", "ANN001", "ANN202", "S101"]
 
 [tool.maturin]
 manifest-path = "rust/badwords-py/Cargo.toml"
 python-source = "python"
 python-packages = ["badwords"]
 module-name = "badwords._native"
+include = [{ path = "python/badwords/py.typed", format = "wheel" }]
