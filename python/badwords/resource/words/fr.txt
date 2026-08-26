@@ -3,10 +3,12 @@ fermersagueule
 fermetagueule
 putaindemerde
 rienàenculer
-traces?depneu
+tracedepneu
+tracesdepneu
 rienàfoutre
 trousdeballe
-cassecouilles?
+cassecouille
+cassecouilles
 troudeballe
 nulàchier
 trouducune
@@ -20,7 +22,8 @@ cassecul
 emmerdeuses
 partouzeurs
 sallopperie
-conneries?
+connerie
+conneries
 couillasse
 emmerdeurs
 emmerdeuse
