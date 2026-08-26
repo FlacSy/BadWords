@@ -10,6 +10,17 @@ homepage.workspace = true
 documentation = "https://badwords.flacsy.dev"
 keywords = ["profanity", "filter", "moderation", "content"]
 categories = ["text-processing"]
+
+# Everything the published crate needs, and nothing else.
+include = [
+    "src/**/*.rs",
+    "resources/data/*.json",
+    "resources/words/*.txt",
+    "resources/words/SOURCES.md",
+    "README.md",
+    "LICENSE",
+    "NOTICE",
+]
 authors.workspace = true
 
 [features]
