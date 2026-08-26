@@ -136,9 +136,7 @@ def _run_filter(
     return m, details
 
 
-def _print_results(
-    name: str, m: dict[str, float], verbose: bool, details: list
-) -> None:
+def _print_results(name: str, m: dict[str, float], verbose: bool, details: list) -> None:
     print(f"\n{name}")
     print("-" * 50)
     print(f"  Accuracy:  {m['accuracy']:.2%}")
@@ -159,12 +157,8 @@ def _print_results(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Compare BadWords vs glin-profanity quality"
-    )
-    parser.add_argument(
-        "-v", "--verbose", action="store_true", help="Show error details"
-    )
+    parser = argparse.ArgumentParser(description="Compare BadWords vs glin-profanity quality")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Show error details")
     parser.add_argument(
         "--curated",
         action="store_true",
@@ -177,9 +171,7 @@ def main() -> None:
         metavar="N",
         help="Samples per class from HF dataset (default: 1000)",
     )
-    parser.add_argument(
-        "--seed", type=int, default=42, help="Random seed for HF sampling"
-    )
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for HF sampling")
     args = parser.parse_args()
 
     if args.curated:
@@ -233,42 +225,30 @@ def main() -> None:
         def glin_pred(text: str) -> bool:
             return bool(glin.is_profane(text))
 
-        m_glin, details_glin = _run_filter(
-            "glin-profanity (rule-based)", glin_pred, cases
-        )
-        _print_results(
-            "glin-profanity (rule-based)", m_glin, args.verbose, details_glin
-        )
+        m_glin, details_glin = _run_filter("glin-profanity (rule-based)", glin_pred, cases)
+        _print_results("glin-profanity (rule-based)", m_glin, args.verbose, details_glin)
         results.append(("glin (rule)", m_glin))
     except ImportError as e:
         print(f"\nglin-profanity (rule-based): SKIPPED (ImportError: {e})")
 
     # --- BadWords ML ---
-    bw_ml_ok = False
     ml_models_dir = Path(__file__).parent.parent / "ml" / "models"
     if (ml_models_dir / "model.onnx").exists():
         try:
             from optimum.onnxruntime import ORTModelForSequenceClassification
             from transformers import AutoTokenizer
 
-            bw_ml_model = ORTModelForSequenceClassification.from_pretrained(
-                str(ml_models_dir)
-            )
-            bw_ml_tok = AutoTokenizer.from_pretrained(
-                str(ml_models_dir), fix_mistral_regex=True
-            )
+            bw_ml_model = ORTModelForSequenceClassification.from_pretrained(str(ml_models_dir))
+            bw_ml_tok = AutoTokenizer.from_pretrained(str(ml_models_dir), fix_mistral_regex=True)
 
             def bw_ml_pred(text: str) -> bool:
-                inp = bw_ml_tok(
-                    text, return_tensors="pt", truncation=True, max_length=128
-                )
+                inp = bw_ml_tok(text, return_tensors="pt", truncation=True, max_length=128)
                 prob = bw_ml_model(**inp).logits.softmax(dim=-1)[0, 1].item()
                 return prob >= 0.5
 
             m_bw_ml, details_bw_ml = _run_filter("BadWords (ML)", bw_ml_pred, cases)
             _print_results("BadWords (ML)", m_bw_ml, args.verbose, details_bw_ml)
             results.append(("BadWords (ML)", m_bw_ml))
-            bw_ml_ok = True
         except Exception as e:
             print(f"\nBadWords (ML): SKIPPED ({e})")
     else:
@@ -283,7 +263,6 @@ def main() -> None:
             m_bw_ml, details_bw_ml = _run_filter("BadWords (ML)", bw_ml_pred, cases)
             _print_results("BadWords (ML)", m_bw_ml, args.verbose, details_bw_ml)
             results.append(("BadWords (ML)", m_bw_ml))
-            bw_ml_ok = True
         except Exception as e:
             print(f"\nBadWords (ML): SKIPPED ({e})")
 
@@ -307,12 +286,8 @@ def main() -> None:
                     return bool(r.get("is_toxic", r.get("contains_profanity", False)))
                 return bool(r)
 
-            m_glin_ml, details_glin_ml = _run_filter(
-                "glin-profanity (ML)", glin_ml_pred, cases
-            )
-            _print_results(
-                "glin-profanity (ML)", m_glin_ml, args.verbose, details_glin_ml
-            )
+            m_glin_ml, details_glin_ml = _run_filter("glin-profanity (ML)", glin_ml_pred, cases)
+            _print_results("glin-profanity (ML)", m_glin_ml, args.verbose, details_glin_ml)
             results.append(("glin (ML)", m_glin_ml))
         else:
             print("\nglin-profanity (ML): SKIPPED (ML not ready)")

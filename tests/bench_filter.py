@@ -1,4 +1,7 @@
-"""Benchmarks. Run with: make bench-python"""
+"""Benchmarks.
+
+Run with: make bench-python
+"""
 
 from __future__ import annotations
 

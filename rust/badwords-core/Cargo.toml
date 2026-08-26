@@ -1,15 +1,16 @@
 [package]
 name = "badwords-core"
-version = "2.2.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 description = "Core profanity filter logic - normalization, transliteration, homoglyphs"
-license = "MIT"
-repository = "https://github.com/FlacSy/badwords"
-homepage = "https://badwords.flacsy.dev"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 documentation = "https://badwords.flacsy.dev"
 keywords = ["profanity", "filter", "moderation", "content"]
 categories = ["text-processing"]
-authors = ["FlacSy <flacsy.x@gmail.com>", "iamlostshe <vanamelcikov7275@gmail.com>"]
+authors.workspace = true
 
 [features]
 default = ["fs-resources", "embedded-data", "embedded-words"]

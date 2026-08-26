@@ -9,6 +9,8 @@ rust/badwords-wasm/pkg/
 rust/badwords-wasm/pkg-web/
 rust/badwords-wasm/pkg-node/
 
+node_modules/
+
 # Virtual environments
 .venv
 venv

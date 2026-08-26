@@ -42,7 +42,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "badwords-core"
-version = "2.2.0"
+version = "3.0.0"
 dependencies = [
  "aho-corasick",
  "criterion",
@@ -63,7 +63,7 @@ dependencies = [
 
 [[package]]
 name = "badwords-py"
-version = "2.3.1"
+version = "3.0.0"
 dependencies = [
  "badwords-core",
  "pyo3",
@@ -71,9 +71,12 @@ dependencies = [
 
 [[package]]
 name = "badwords-wasm"
-version = "2.2.0"
+version = "3.0.0"
 dependencies = [
  "badwords-core",
+ "js-sys",
+ "serde",
+ "serde-wasm-bindgen",
  "wasm-bindgen",
  "wasm-bindgen-test",
 ]
@@ -777,6 +780,17 @@ checksum = "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e"
 dependencies = [
  "serde_core",
  "serde_derive",
+]
+
+[[package]]
+name = "serde-wasm-bindgen"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8302e169f0eddcc139c70f139d19d6467353af16f9fce27e8c30158036a1e16b"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
 ]
 
 [[package]]

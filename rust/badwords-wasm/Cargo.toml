@@ -1,23 +1,25 @@
 [package]
 name = "badwords-wasm"
-version = "2.2.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 description = "WebAssembly profanity filter - badwords for browser and Node.js"
-license = "MIT"
-repository = "https://github.com/FlacSy/badwords"
-homepage = "https://badwords.flacsy.dev"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 documentation = "https://badwords.flacsy.dev"
 keywords = ["profanity", "filter", "moderation", "content", "wasm", "webassembly"]
-authors = ["FlacSy <flacsy.x@gmail.com>", "iamlostshe <vanamelcikov7275@gmail.com>"]
+authors.workspace = true
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-badwords-core = { path = "../badwords-core", default-features = false, features = [
-    "embedded-words-min",
-] }
+badwords-core = { workspace = true, features = ["embedded-words-min"] }
 wasm-bindgen = "0.2"
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = "0.6"
+js-sys = "0.3"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

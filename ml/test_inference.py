@@ -46,9 +46,7 @@ def main() -> None:
         print(f"  {prob:.3f} [{label:5}] {ok} (exp: {exp_str})  {text!r}")
 
     print("=" * 70)
-    print(
-        f"Accuracy: {correct}/{len(TEST_CASES)} ({100 * correct / len(TEST_CASES):.0f}%)"
-    )
+    print(f"Accuracy: {correct}/{len(TEST_CASES)} ({100 * correct / len(TEST_CASES):.0f}%)")
     print("Note: evasion (leetspeak, spacing), indirect RU insults often missed.")
     print("=" * 70)
 
