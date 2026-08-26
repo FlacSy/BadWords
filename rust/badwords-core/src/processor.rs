@@ -214,14 +214,18 @@ impl TextProcessor {
             text.to_string()
         };
 
+        // Homoglyphs must be folded BEFORE transliteration. The other way round,
+        // transliteration maps latin `s` to cyrillic `с`, which the homoglyph pass
+        // then folds back to latin `c` - making `s` and `c` (and `h` and `x`)
+        // indistinguishable, so `sock` matched `cock` and `disk` matched `dick`.
+        if self.replace_homoglyphs {
+            txt = self.replace_homoglyphs(&txt);
+        }
         if self.transliterate {
             if Self::contains_cyrillic(&txt) {
                 txt = self.transliterate(&txt, true);
             }
             txt = self.transliterate(&txt, false);
-        }
-        if self.replace_homoglyphs {
-            txt = self.replace_homoglyphs(&txt);
         }
         txt
     }
