@@ -24,7 +24,7 @@ struct Case {
 }
 
 fn resource_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../python/badwords/resource")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources")
 }
 
 #[test]

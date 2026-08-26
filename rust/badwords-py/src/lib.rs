@@ -34,10 +34,7 @@ impl PyProfanityFilter {
     }
 
     #[pyo3(signature = (languages=None))]
-    fn init(
-        &mut self,
-        languages: Option<&Bound<'_, PyList>>,
-    ) -> PyResult<()> {
+    fn init(&mut self, languages: Option<&Bound<'_, PyList>>) -> PyResult<()> {
         let langs = languages.map(|list| {
             list.iter()
                 .map(|o| o.extract::<String>())
@@ -86,9 +83,7 @@ impl PyProfanityFilter {
         Python::with_gil(|py| {
             if replace_character.is_some() {
                 if found {
-                    Ok(replaced
-                        .unwrap_or_else(|| text.to_string())
-                        .into_py(py))
+                    Ok(replaced.unwrap_or_else(|| text.to_string()).into_py(py))
                 } else {
                     Ok(false.into_py(py))
                 }

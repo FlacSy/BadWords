@@ -2,9 +2,14 @@
 
 use std::collections::HashMap;
 use std::path::Path;
-use unicode_normalization::UnicodeNormalization;
 
 use serde::Deserialize;
+use unicode_normalization::UnicodeNormalization;
+
+use crate::error::Error;
+
+/// Cyrillic-to-latin and latin-to-cyrillic maps, built from one table.
+type TransliterationMaps = (HashMap<char, String>, HashMap<String, char>);
 
 #[derive(Debug, Clone)]
 pub struct TextProcessor {
@@ -32,10 +37,6 @@ struct TransliterationFile {
     cyrillic_to_latin: HashMap<String, String>,
 }
 
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-struct CharacterFrequencyFile(HashMap<String, Vec<String>>);
-
 impl TextProcessor {
     pub fn new(
         normalize_text: bool,
@@ -55,20 +56,27 @@ impl TextProcessor {
         }
     }
 
-    pub fn load_from_dir(&mut self, data_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
-        let unicode_content = std::fs::read_to_string(data_dir.join("unicode_mappings.json"))?;
-        let homoglyph_content = std::fs::read_to_string(data_dir.join("homoglyphs.json"))?;
-        let translit_content = std::fs::read_to_string(data_dir.join("transliteration.json"))?;
+    /// Load the normalization tables from a `data/` directory.
+    ///
+    /// # Errors
+    /// [`Error::Io`] or [`Error::Json`].
+    pub fn load_from_dir(&mut self, data_dir: &Path) -> Result<(), Error> {
+        let unicode_content = read(data_dir, "unicode_mappings.json")?;
+        let homoglyph_content = read(data_dir, "homoglyphs.json")?;
+        let translit_content = read(data_dir, "transliteration.json")?;
         self.load_from_str(&unicode_content, &homoglyph_content, &translit_content)
     }
 
-    /// Load processor data from string content (no filesystem). Use for WASM/embedded.
+    /// Load the normalization tables from string contents.
+    ///
+    /// # Errors
+    /// [`Error::Json`] if a table is malformed.
     pub fn load_from_str(
         &mut self,
         unicode_mappings_json: &str,
         homoglyphs_json: &str,
         transliteration_json: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Error> {
         self.unicode_mappings = Self::parse_unicode_mappings(unicode_mappings_json)?;
         self.homoglyph_map = Self::parse_homoglyph_map(homoglyphs_json)?;
 
@@ -82,8 +90,8 @@ impl TextProcessor {
         Ok(())
     }
 
-    fn parse_unicode_mappings(content: &str) -> Result<HashMap<char, char>, Box<dyn std::error::Error>> {
-        let data: UnicodeMappingsFile = serde_json::from_str(content)?;
+    fn parse_unicode_mappings(content: &str) -> Result<HashMap<char, char>, Error> {
+        let data: UnicodeMappingsFile = parse(content, "unicode_mappings.json")?;
 
         let mut mappings = HashMap::new();
         for category in data.categories.values() {
@@ -96,8 +104,8 @@ impl TextProcessor {
         Ok(mappings)
     }
 
-    fn parse_homoglyph_map(content: &str) -> Result<HashMap<char, char>, Box<dyn std::error::Error>> {
-        let data: HomoglyphsFile = serde_json::from_str(content)?;
+    fn parse_homoglyph_map(content: &str) -> Result<HashMap<char, char>, Error> {
+        let data: HomoglyphsFile = parse(content, "homoglyphs.json")?;
 
         let mut map = HashMap::new();
         for (standard, variants) in data.0 {
@@ -113,10 +121,8 @@ impl TextProcessor {
         Ok(map)
     }
 
-    fn parse_transliteration(
-        content: &str,
-    ) -> Result<(HashMap<char, String>, HashMap<String, char>), Box<dyn std::error::Error>> {
-        let data: TransliterationFile = serde_json::from_str(content)?;
+    fn parse_transliteration(content: &str) -> Result<TransliterationMaps, Error> {
+        let data: TransliterationFile = parse(content, "transliteration.json")?;
 
         let mut cyrillic_to_latin = HashMap::new();
         let mut latin_to_cyrillic = HashMap::new();
@@ -138,11 +144,7 @@ impl TextProcessor {
             .to_lowercase()
             .chars()
             .map(|c| *self.unicode_mappings.get(&c).unwrap_or(&c))
-            .filter(|c| {
-                c.is_alphanumeric()
-                    || c.is_whitespace()
-                    || (allow_underscore && *c == '_')
-            })
+            .filter(|c| c.is_alphanumeric() || c.is_whitespace() || (allow_underscore && *c == '_'))
             .collect();
         filtered.split_whitespace().collect::<Vec<_>>().join(" ")
     }
@@ -229,4 +231,16 @@ impl TextProcessor {
         }
         txt
     }
+}
+
+fn read(dir: &Path, name: &str) -> Result<String, Error> {
+    let path = dir.join(name);
+    std::fs::read_to_string(&path).map_err(|source| Error::Io { path, source })
+}
+
+fn parse<T: serde::de::DeserializeOwned>(content: &str, resource: &str) -> Result<T, Error> {
+    serde_json::from_str(content).map_err(|source| Error::Json {
+        resource: resource.to_string(),
+        source,
+    })
 }
