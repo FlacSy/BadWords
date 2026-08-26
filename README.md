@@ -329,7 +329,7 @@ cargo install wasm-pack
 make wasm
 ```
 
-Output: `rust/badwords-wasm/pkg/` (npm package `badwords-wasm`)
+Output: `rust/badwords-wasm/pkg-web/` for the browser build, `rust/badwords-wasm/pkg-node/` for Node.js (npm package `badwords-wasm`)
 
 - **Browser:** Use the generated JS with a bundler or static server. See `examples/wasm/browser/`
 - **Node.js:** `import init, { ProfanityFilter } from 'badwords-wasm'` after `npm install`. See `examples/wasm/node/`
