@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "badwords-py"
-version = "2.3.1"
+version = "3.0.0"
 requires-python = ">=3.10"
 authors = [
   {name = "iamlostshe", email = "vanamelcikov7275@gmail.com"},
@@ -66,7 +66,13 @@ ignore = [
 # Tests assert, compare against literals and do not need public-API docstrings.
 "tests/*" = ["S101", "PLR2004", "D103", "ANN001", "ANN201", "SLF001", "INP001"]
 # Scripts and examples are run by hand and print their results.
-"scripts/*" = ["T201", "INP001", "S603", "S607"]
+# Standalone tooling: prints results, imports lazily, catches broadly on purpose.
+"scripts/*" = [
+  "T201", "INP001", "S603", "S607", "PLC0415", "BLE001", "ANN001", "ANN202",
+  "E501", "PLR2004", "EXE001", "D103", "S110", "ARG001", "C901", "ERA001",
+  "PLR0912", "PLR0915", "TRY300", "PERF203", "S310", "TRY003", "EM101", "EM102",
+  "ANN002", "ANN003", "PLC0206", "S311", "FBT001", "FBT002",
+]
 "examples/*" = ["T201", "INP001", "D103"]
 # The training pipeline is a set of standalone scripts, not library code.
 "ml/*" = ["T201", "INP001", "D103", "BLE001", "PLC0415", "EXE001", "ANN001", "ANN202", "S101"]

@@ -76,9 +76,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if not args.data.exists():
-        raise FileNotFoundError(
-            f"Data not found: {args.data}. Run prepare_data.py first."
-        )
+        raise FileNotFoundError(f"Data not found: {args.data}. Run prepare_data.py first.")
 
     dataset = load_data(args.data)
     if args.full_dataset:

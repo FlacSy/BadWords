@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare BadWords vs glin-profanity (rule-based + ML). Run: python scripts/bench_compare.py"""
+"""Compare BadWords vs glin-profanity (rule-based + ML). Run: python scripts/bench_compare.py""".
 
 import platform
 import sys
@@ -182,12 +182,8 @@ def main() -> None:
             from optimum.onnxruntime import ORTModelForSequenceClassification
             from transformers import AutoTokenizer
 
-            bw_ml_model = ORTModelForSequenceClassification.from_pretrained(
-                str(ml_models_dir)
-            )
-            bw_ml_tok = AutoTokenizer.from_pretrained(
-                str(ml_models_dir), fix_mistral_regex=True
-            )
+            bw_ml_model = ORTModelForSequenceClassification.from_pretrained(str(ml_models_dir))
+            bw_ml_tok = AutoTokenizer.from_pretrained(str(ml_models_dir), fix_mistral_regex=True)
         except Exception:
             pass
 
@@ -215,9 +211,7 @@ def main() -> None:
     if bw_ml_model is not None and bw_ml_tok is not None:
 
         def _bw_clean():
-            inp = bw_ml_tok(
-                texts_clean, return_tensors="pt", truncation=True, max_length=128
-            )
+            inp = bw_ml_tok(texts_clean, return_tensors="pt", truncation=True, max_length=128)
             bw_ml_model(**inp).logits.softmax(dim=-1)[0, 1].item()
 
         _run_ml_bench("bw", _bw_clean, "Clean text")
@@ -238,9 +232,7 @@ def main() -> None:
     if bw_ml_model is not None and bw_ml_tok is not None:
 
         def _bw_bad():
-            inp = bw_ml_tok(
-                texts_bad, return_tensors="pt", truncation=True, max_length=128
-            )
+            inp = bw_ml_tok(texts_bad, return_tensors="pt", truncation=True, max_length=128)
             bw_ml_model(**inp).logits.softmax(dim=-1)[0, 1].item()
 
         _run_ml_bench("bw", _bw_bad, "Bad word")

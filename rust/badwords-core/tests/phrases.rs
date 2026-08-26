@@ -16,7 +16,7 @@ fn shipped_phrases() -> Vec<(String, String)> {
     let mut phrases = Vec::new();
     for entry in std::fs::read_dir(words_dir()).unwrap().flatten() {
         let path = entry.path();
-        if path.extension().is_none_or(|e| e != "txt") {
+        if path.extension().map_or(true, |e| e != "txt") {
             continue;
         }
         let code = path.file_stem().unwrap().to_string_lossy().into_owned();

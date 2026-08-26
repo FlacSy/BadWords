@@ -149,7 +149,7 @@ class ProfanityFilter:
         self._ensure_init().clear_words()
 
     def word_count(self) -> int:
-        """Number of distinct entries."""
+        """Count distinct entries in the dictionary."""
         return self._ensure_init().word_count()
 
     def contains_word(self, word: str) -> bool:
@@ -223,7 +223,7 @@ class ProfanityFilter:
         return self._ensure_init().similar(a, b)
 
     def normalize(self, text: str) -> str:
-        """The normalized form of a text, as the matcher sees it."""
+        """Return the normalized form of a text, as the matcher sees it."""
         return self._ensure_init().normalize(text)
 
     # -- deprecated ----------------------------------------------------------
@@ -249,7 +249,7 @@ class ProfanityFilter:
         return self._ensure_init().filter_text(text, match_threshold or 1.0, replace_character)
 
     def get_all_languages(self) -> list[str]:
-        """Loaded languages.
+        """Return the loaded languages.
 
         .. deprecated:: 3.0.0
             The name is misleading. Use :meth:`loaded_languages` or

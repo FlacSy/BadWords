@@ -1,4 +1,6 @@
-.PHONY: sync-resources check-resources develop build build-pypi test test-rust test-python test-wasm bench bench-rust bench-python bench-compare quality-compare lint lint-fix format format-fix wasm wasm-nodejs npm-publish npm-publish-nodejs lang-packages npm-publish-languages ml-prepare ml-prepare-full ml-train ml-test ml-quantize ml-package
+PYTHON := $(shell if [ -d .venv ]; then echo .venv/bin/python; else echo python3; fi)
+
+.PHONY: sync-resources check-resources sync-version check-version fp-report develop build build-pypi test test-rust test-python test-wasm bench bench-rust bench-python bench-compare quality-compare lint lint-fix format format-fix wasm wasm-nodejs wasm-typecheck npm-publish npm-publish-nodejs lang-packages npm-publish-languages ml-prepare ml-prepare-full ml-train ml-test ml-quantize ml-package
 
 # The canonical resources live in the crate; python/badwords/resource is a
 # mirror so that maturin ships them inside the wheel.
@@ -75,10 +77,16 @@ lint-fix:
 # WebAssembly build for browser
 wasm:
 	cd rust/badwords-wasm && wasm-pack build --target web --out-dir pkg-web
+	@$(PYTHON) scripts/refine-wasm-types.py
 
 # WebAssembly build for Node.js
 wasm-nodejs:
 	cd rust/badwords-wasm && wasm-pack build --target nodejs --out-dir pkg-node
+	@$(PYTHON) scripts/refine-wasm-types.py
+
+# Typecheck the TypeScript example against the generated declarations
+wasm-typecheck: wasm-nodejs
+	cd examples/wasm/node && npm install --silent --no-fund --no-audit && npx tsc --noEmit
 
 # Publish the browser build (run `make wasm` first)
 npm-publish:
@@ -88,8 +96,22 @@ npm-publish:
 npm-publish-nodejs:
 	cd rust/badwords-wasm/pkg-node && npm publish
 
-lang-packages:
-	python3 scripts/generate-lang-packages.py
+# Propagate the workspace version to pyproject.toml and the npm packages
+sync-version:
+	@if [ -d .venv ]; then .venv/bin/python scripts/sync_version.py; \
+	else python3 scripts/sync_version.py; fi
+
+check-version:
+	@if [ -d .venv ]; then .venv/bin/python scripts/sync_version.py --check; \
+	else python3 scripts/sync_version.py --check; fi
+
+# Measure the false-positive cost of each opt-in detector
+fp-report:
+	cargo run --release -p badwords-core --bin fp_report --features substring
+
+lang-packages: sync-version
+	@if [ -d .venv ]; then .venv/bin/python scripts/generate-lang-packages.py; \
+	else python3 scripts/generate-lang-packages.py; fi
 
 npm-publish-languages:
 	cd js/languages && npm publish --access public
