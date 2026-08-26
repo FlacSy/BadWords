@@ -111,7 +111,7 @@ pub(crate) fn find_into(
     scratch.consumed.resize(scratch.segments.len(), false);
 
     if opts.phrases && ctx.dict.has_phrases() {
-        phrase_pass(ctx, text, opts, scratch, out, whole, first_only);
+        phrase_pass(ctx, text, scratch, out, whole, first_only);
         if first_only && !out.is_empty() {
             return;
         }
@@ -312,26 +312,37 @@ fn make_match(
 ///
 /// Exact only: comparing a four-token phrase against arbitrary token pairs
 /// fuzzily is both meaningless and slow.
+///
+/// Segments that normalize to nothing - a lone dash, say - are skipped rather
+/// than breaking a phrase, so an entry written `son - of a bitch` still
+/// matches `son of a bitch`.
 fn phrase_pass(
     ctx: &Ctx<'_>,
     text: &str,
-    opts: Options,
     scratch: &mut Scratch,
     out: &mut Vec<Match>,
     whole: bool,
     first_only: bool,
 ) {
-    let n = scratch.segments.len();
-    let max_tokens = ctx.dict.max_phrase_tokens();
-    let mut i = 0usize;
+    // Positions of the segments that carry content.
+    let significant: Vec<usize> = (0..scratch.segments.len())
+        .filter(|&i| !scratch.bases[i].is_empty())
+        .collect();
+    if significant.len() < 2 {
+        return;
+    }
 
-    while i < n {
-        if scratch.consumed[i] || scratch.bases[i].is_empty() {
-            i += 1;
+    let max_tokens = ctx.dict.max_phrase_tokens();
+    let mut cursor = 0usize;
+
+    while cursor < significant.len() {
+        let first = significant[cursor];
+        if scratch.consumed[first] {
+            cursor += 1;
             continue;
         }
-        let Some(candidates) = ctx.dict.phrase_candidates(&scratch.bases[i]) else {
-            i += 1;
+        let Some(candidates) = ctx.dict.phrase_candidates(&scratch.bases[first]) else {
+            cursor += 1;
             continue;
         };
 
@@ -339,24 +350,30 @@ fn phrase_pass(
         'candidates: for &id in candidates {
             let entry = ctx.dict.entry(id);
             let k = entry.token_count as usize;
-            if k < 2 || k > max_tokens || i + k > n {
-                continue;
-            }
-            let mut tokens = entry.form.split(' ');
-            for offset in 0..k {
-                let Some(token) = tokens.next() else {
-                    continue 'candidates;
-                };
-                if scratch.consumed[i + offset] || scratch.bases[i + offset] != token {
-                    continue 'candidates;
-                }
-            }
-            if (i..i + k).any(|idx| ctx.dict.is_whitelisted(&scratch.bases[idx])) {
+            if k < 2 || k > max_tokens || cursor + k > significant.len() {
                 continue;
             }
 
-            let (start, _) = primary_span(&scratch.segments[i], whole);
-            let (_, end) = primary_span(&scratch.segments[i + k - 1], whole);
+            let mut tokens = entry.form.split(' ');
+            for offset in 0..k {
+                let segment = significant[cursor + offset];
+                let Some(token) = tokens.next() else {
+                    continue 'candidates;
+                };
+                if scratch.consumed[segment] || scratch.bases[segment] != token {
+                    continue 'candidates;
+                }
+            }
+            if (0..k).any(|o| {
+                ctx.dict
+                    .is_whitelisted(&scratch.bases[significant[cursor + o]])
+            }) {
+                continue;
+            }
+
+            let (start, _) = primary_span(&scratch.segments[first], whole);
+            let last = significant[cursor + k - 1];
+            let (_, end) = primary_span(&scratch.segments[last], whole);
             out.push(make_match(
                 ctx,
                 text,
@@ -366,8 +383,8 @@ fn phrase_pass(
                 1.0,
                 MatchKind::Phrase,
             ));
-            for idx in i..i + k {
-                scratch.consumed[idx] = true;
+            for offset in 0..k {
+                scratch.consumed[significant[cursor + offset]] = true;
             }
             matched = k;
             break;
@@ -377,11 +394,10 @@ fn phrase_pass(
             if first_only {
                 return;
             }
-            i += matched;
+            cursor += matched;
         } else {
-            i += 1;
+            cursor += 1;
         }
-        let _ = opts;
     }
 }
 

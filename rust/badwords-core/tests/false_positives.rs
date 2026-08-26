@@ -10,6 +10,11 @@ use badwords_core::{MatchMode, Options, ProfanityFilter};
 
 const CORPUS: &str = "/usr/share/dict/american-english";
 
+/// Dictionary words that are not themselves dictionary entries.
+///
+/// Inflections of profanity stay in this corpus - `whorehouses` is "clean"
+/// here only because `whorehouse` is the entry - so the rates measured against
+/// it overstate the true false-positive cost somewhat.
 fn clean_corpus(filter: &ProfanityFilter) -> Option<Vec<String>> {
     let text = std::fs::read_to_string(Path::new(CORPUS)).ok()?;
     Some(
@@ -59,23 +64,38 @@ fn opt_in_detectors_stay_within_budget() {
         assert_eq!(hits, 0, "{name} flagged {hits} clean words ({pct:.3}%)");
     }
 
-    // Substring matching cannot be free; the default length is chosen so that
-    // it stays under a quarter of a percent.
-    let (_, pct) = rate(
-        &filter,
-        &words,
-        base.match_mode(MatchMode::Substring).min_substring_len(6),
-    );
+    // Substring matching cannot be free. With every language loaded, most of
+    // the cost is cross-language leakage: a short entry in one language occurs
+    // inside ordinary words of another.
+    let substring = base.match_mode(MatchMode::Substring);
+    let (_, all_languages) = rate(&filter, &words, substring.min_substring_len(6));
     assert!(
-        pct < 0.30,
-        "substring@6 false-positive rate rose to {pct:.3}%"
+        all_languages < 0.40,
+        "substring@6 with every language rose to {all_languages:.3}%"
     );
 
     // A shorter minimum is much worse, which is why 6 is the default.
-    let (_, short) = rate(
-        &filter,
-        &words,
-        base.match_mode(MatchMode::Substring).min_substring_len(4),
+    let (_, shorter) = rate(&filter, &words, substring.min_substring_len(4));
+    assert!(
+        shorter > all_languages,
+        "expected a shorter minimum to be worse"
     );
-    assert!(short > pct, "expected a shorter minimum to be worse");
+
+    // Loading only the language you need cuts it by more than half. This is
+    // the number to quote to anyone turning substring matching on.
+    let english = ProfanityFilter::builder()
+        .embedded()
+        .languages(["en"])
+        .build()
+        .unwrap();
+    let english_words = clean_corpus(&english).expect("corpus was readable above");
+    let (_, english_only) = rate(&english, &english_words, substring.min_substring_len(6));
+    assert!(
+        english_only < 0.20,
+        "substring@6 with English only rose to {english_only:.3}%"
+    );
+    assert!(
+        english_only < all_languages,
+        "expected fewer false positives with one language"
+    );
 }

@@ -141,22 +141,38 @@ def test_wordlist_entries_match_themselves(path: Path) -> None:
 
 
 @pytest.mark.parametrize("path", sorted(WORDS_DIR.glob("*.txt")), ids=lambda p: p.stem)
-def test_wordlist_entries_are_single_tokens(path: Path) -> None:
-    """Every entry is a single token; multi-word entries can never match."""
-    lines = path.read_text(encoding="utf-8-sig").splitlines()
-    multiword = [line for line in lines if line.strip() and " " in line.strip()]
-    if path.stem in {"ko", "no"}:
-        pytest.xfail(f"{path.stem}.txt still ships multi-word entries")
-    assert multiword == []
+def test_wordlist_is_sorted_unique_and_lowercase(path: Path) -> None:
+    """Word lists stay a sorted, deduplicated list of lowercase entries."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    assert lines == sorted(lines), f"{path.name} is not sorted"
+    assert len(lines) == len(set(lines)), f"{path.name} has duplicates"
+    assert all(line == line.strip() for line in lines), f"{path.name} has stray whitespace"
+    assert all(line == line.lower() for line in lines), f"{path.name} is not lowercase"
+    assert all(line for line in lines), f"{path.name} has blank lines"
 
 
-def test_english_wordlist_is_plain_sorted_and_unique() -> None:
-    """en.txt stays a sorted, deduplicated list of plain lowercase words."""
+@pytest.mark.parametrize("path", sorted(WORDS_DIR.glob("*.txt")), ids=lambda p: p.stem)
+def test_multi_word_entries_are_detected(path: Path) -> None:
+    """Multi-word entries match, which they could not before 3.0.0."""
+    lines = [line.strip() for line in path.read_text(encoding="utf-8").splitlines()]
+    phrases = [line for line in lines if " " in line]
+    if not phrases:
+        pytest.skip(f"{path.stem} has no multi-word entries")
+
+    p = ProfanityFilter()
+    p.init(languages=[path.stem])
+    assert [phrase for phrase in phrases if not p.is_profane(phrase)] == []
+
+
+def test_english_wordlist_is_plain_ascii() -> None:
+    """en.txt holds plain ASCII entries.
+
+    Hyphens, ampersands and spaces occur in real entries (`g-spot`, `s&m`,
+    `2 girls 1 cup`); anything resembling markup is caught by
+    test_wordlist_has_no_regex_patterns.
+    """
     lines = (WORDS_DIR / "en.txt").read_text(encoding="utf-8").splitlines()
-    assert lines == sorted(lines)
-    assert len(lines) == len(set(lines))
-    assert all(line == line.strip().lower() for line in lines)
-    assert all(line.isascii() and line.isalnum() for line in lines)
+    assert [line for line in lines if not line.isascii()] == []
 
 
 def test_english_wordlist_entries_all_match_themselves() -> None:
