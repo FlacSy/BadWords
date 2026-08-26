@@ -13,5 +13,5 @@ name = "_native"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-badwords-core = { path = "../badwords-core" }
+badwords-core = { path = "../badwords-core", features = ["substring"] }
 pyo3 = { version = "0.22", features = ["extension-module"] }

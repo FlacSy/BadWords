@@ -7,7 +7,8 @@ from pathlib import Path
 import pytest
 from badwords import ProfanityFilter
 
-WORDS_DIR = Path(__file__).parent.parent / "python" / "badwords" / "resource" / "words"
+# The crate holds the canonical copy; python/badwords/resource is a mirror.
+WORDS_DIR = Path(__file__).parent.parent / "rust" / "badwords-core" / "resources" / "words"
 
 # Profanity that must be caught in English. Regression guard: before the word list
 # was flattened, en.txt held regex patterns that the engine matched literally, so
@@ -81,7 +82,7 @@ def en_filter() -> ProfanityFilter:
 @pytest.mark.parametrize("word", EN_MUST_DETECT)
 def test_english_profanity_is_detected(en_filter: ProfanityFilter, word: str) -> None:
     """Common English profanity is detected."""
-    assert en_filter.filter_text(word) is True
+    assert en_filter.is_profane(word) is True
 
 
 @pytest.mark.parametrize("word", EN_MUST_NOT_DETECT)
@@ -90,7 +91,7 @@ def test_ordinary_english_is_not_flagged(
     word: str,
 ) -> None:
     """Ordinary English words are not flagged."""
-    assert en_filter.filter_text(word) is False
+    assert en_filter.is_profane(word) is False
 
 
 @pytest.mark.parametrize(
@@ -108,8 +109,8 @@ def test_letters_are_not_conflated(clean: str, profane: str) -> None:
     p = ProfanityFilter()
     p.init(languages=[])
     p.add_words([profane])
-    assert p.filter_text(profane) is True
-    assert p.filter_text(clean) is False
+    assert p.is_profane(profane) is True
+    assert p.is_profane(clean) is False
 
 
 # Regex metacharacters. The engine matches word list entries literally after
@@ -136,7 +137,7 @@ def test_wordlist_entries_match_themselves(path: Path) -> None:
         for line in path.read_text(encoding="utf-8-sig").splitlines()
         if line.strip() and " " not in line.strip()
     ]
-    assert [w for w in lines if p.filter_text(w) is not True] == []
+    assert [w for w in lines if p.is_profane(w) is not True] == []
 
 
 @pytest.mark.parametrize("path", sorted(WORDS_DIR.glob("*.txt")), ids=lambda p: p.stem)
@@ -163,4 +164,4 @@ def test_english_wordlist_entries_all_match_themselves() -> None:
     p = ProfanityFilter()
     p.init(languages=["en"])
     lines = (WORDS_DIR / "en.txt").read_text(encoding="utf-8").splitlines()
-    assert [line for line in lines if p.filter_text(line) is not True] == []
+    assert [line for line in lines if p.is_profane(line) is not True] == []

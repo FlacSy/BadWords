@@ -11,12 +11,12 @@ check-resources:
 		|| (echo "run: make sync-resources"; exit 1)
 
 develop: sync-resources
-	cd python && maturin develop
+	maturin develop
 	@SO=$$(find .venv -name "_native*.so" 2>/dev/null | head -1); \
 	if [ -n "$$SO" ]; then mkdir -p _native && cp "$$SO" _native/; fi
 
-build:
-	cd python && maturin build
+build: sync-resources
+	maturin build
 
 # Build for PyPI (manylinux wheels, requires Docker)
 build-pypi:
