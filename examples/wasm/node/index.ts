@@ -6,7 +6,7 @@
  */
 
 // @ts-ignore - CommonJS wasm module
-const { ProfanityFilter } = require('../../../rust/badwords-wasm/pkg/badwords_wasm.js');
+const { ProfanityFilter } = require('../../../rust/badwords-wasm/pkg-node/badwords_wasm.js');
 
 function main(): void {
   const filter = new ProfanityFilter();

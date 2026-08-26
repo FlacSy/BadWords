@@ -2,12 +2,12 @@
  * BadWords WASM - Node.js example
  *
  * Build for Node.js first: make wasm-nodejs
- * Run: node examples/wasm/backend/index.js
+ * Run: node examples/wasm/node/index.js
  *
  * Note: Node.js build uses CommonJS (synchronous load, no init needed)
  */
 
-const { ProfanityFilter } = require('../../../crates/badwords-wasm/pkg/badwords_wasm.js');
+const { ProfanityFilter } = require('../../../rust/badwords-wasm/pkg-node/badwords_wasm.js');
 
 function main() {
   const filter = new ProfanityFilter();
