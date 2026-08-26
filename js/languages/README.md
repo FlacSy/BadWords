@@ -28,31 +28,31 @@ TypeScript declarations are included; each import is typed as `string[]`.
 
 | Code | Language | Entries |
 |------|----------|---------|
-| `cs` | Czech | 51 |
-| `da` | Danish | 60 |
-| `de` | German | 87 |
-| `el` | Greek | 470 |
-| `en` | English | 426 |
-| `es` | Spanish | 433 |
+| `cs` | Czech | 217 |
+| `da` | Danish | 207 |
+| `de` | German | 248 |
+| `el` | Greek | 591 |
+| `en` | English | 796 |
+| `es` | Spanish | 584 |
 | `es_419` | Spanish (Latin America) | 184 |
-| `fi` | Finnish | 57 |
-| `fr` | French | 115 |
-| `hu` | Hungarian | 79 |
-| `id` | Indonesian | 122 |
-| `it` | Italian | 166 |
-| `ja` | Japanese | 24 |
-| `ko` | Korean | 175 |
-| `nl` | Dutch | 39 |
-| `no` | Norwegian | 62 |
-| `pl` | Polish | 6835 |
-| `pt` | Portuguese | 83 |
+| `fi` | Finnish | 303 |
+| `fr` | French | 295 |
+| `hu` | Hungarian | 286 |
+| `id` | Indonesian | 236 |
+| `it` | Italian | 409 |
+| `ja` | Japanese | 290 |
+| `ko` | Korean | 341 |
+| `nl` | Dutch | 342 |
+| `no` | Norwegian | 92 |
+| `pl` | Polish | 6974 |
+| `pt` | Portuguese | 271 |
 | `pt_br` | Portuguese (Brazil) | 121 |
-| `ro` | Romanian | 8 |
-| `ru` | Russian | 3693 |
-| `sv` | Swedish | 16 |
-| `th` | Thai | 13 |
-| `tr` | Turkish | 780 |
-| `uk` | Ukrainian | 1981 |
+| `ro` | Romanian | 145 |
+| `ru` | Russian | 3905 |
+| `sv` | Swedish | 181 |
+| `th` | Thai | 172 |
+| `tr` | Turkish | 1031 |
+| `uk` | Ukrainian | 2109 |
 
 ## Legacy codes
 
