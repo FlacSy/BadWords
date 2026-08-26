@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Compare BadWords vs glin-profanity (rule-based + ML). Run: python scripts/bench_compare.py""".
+"""Compare BadWords against glin-profanity, rule-based and ML.
+
+Run: python scripts/bench_compare.py
+"""
 
 import platform
 import sys

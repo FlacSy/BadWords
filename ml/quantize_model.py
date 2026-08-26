@@ -35,6 +35,11 @@ def main() -> None:
         default=MODELS_DIR,
         help="Path to model directory",
     )
+    parser.add_argument(
+        "--keep-backup",
+        action="store_true",
+        help="Keep model.onnx.fp32 instead of deleting it once quantization succeeds",
+    )
     args = parser.parse_args()
 
     model_dir = args.model_dir.resolve()
@@ -46,21 +51,45 @@ def main() -> None:
 
     quantizer = ORTQuantizer.from_pretrained(str(model_dir))
     qconfig = get_qconfig()
-    print(f"Quantizing (dynamic INT8)...")
+    print("Quantizing (dynamic INT8)...")
+
+    target = model_dir / "model.onnx"
+    backup = model_dir / "model.onnx.fp32"
 
     with tempfile.TemporaryDirectory() as tmp:
         quantizer.quantize(save_dir=tmp, quantization_config=qconfig)
+
         quant_path = Path(tmp) / "model_quantized.onnx"
         if not quant_path.exists():
             quant_path = Path(tmp) / "model.onnx"
-        if quant_path.exists():
-            target = model_dir / "model.onnx"
-            target.unlink()
-            shutil.copy(quant_path, target)
-            new_size = target.stat().st_size
-            print(
-                f"Done: {orig_size / 1e6:.1f} MB -> {new_size / 1e6:.1f} MB ({100 * new_size / orig_size:.0f}%)"
+        if not quant_path.exists():
+            produced = sorted(p.name for p in Path(tmp).iterdir())
+            raise RuntimeError(
+                f"quantization produced no model file in {tmp}; got: {', '.join(produced) or 'nothing'}"
             )
+
+        # Keep the fp32 model until the replacement is fully in place: the
+        # previous version unlinked first and copied second, so a crash in
+        # between lost the model.
+        shutil.copy2(target, backup)
+        try:
+            shutil.copy2(quant_path, target)
+            # ONNX writes tensors above 2 GB into a sidecar next to the model.
+            for extra in Path(tmp).glob("*.onnx_data"):
+                shutil.copy2(extra, model_dir / extra.name)
+        except OSError:
+            shutil.copy2(backup, target)
+            raise
+
+    new_size = target.stat().st_size
+    print(
+        f"Done: {orig_size / 1e6:.1f} MB -> {new_size / 1e6:.1f} MB "
+        f"({100 * new_size / orig_size:.0f}%)"
+    )
+    if args.keep_backup:
+        print(f"fp32 model kept at {backup}")
+    else:
+        backup.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

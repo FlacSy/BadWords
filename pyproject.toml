@@ -33,7 +33,7 @@ classifiers = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "pytest-benchmark>=4.0", "ruff>=0.4"]
-ml = ["onnxruntime>=1.16", "optimum[onnxruntime]>=1.14", "transformers>=4.36"]
+ml = ["onnxruntime>=1.16", "transformers>=4.36", "numpy>=1.24"]
 
 [project.urls]
 Homepage = "https://badwords.flacsy.dev"
@@ -64,7 +64,10 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 # Tests assert, compare against literals and do not need public-API docstrings.
-"tests/*" = ["S101", "PLR2004", "D103", "ANN001", "ANN201", "SLF001", "INP001"]
+"tests/*" = [
+  "S101", "PLR2004", "D103", "D102", "ANN001", "ANN201", "SLF001", "INP001",
+  "PLC0415", "E402", "BLE001", "TID252",
+]
 # Scripts and examples are run by hand and print their results.
 # Standalone tooling: prints results, imports lazily, catches broadly on purpose.
 "scripts/*" = [
@@ -75,7 +78,12 @@ ignore = [
 ]
 "examples/*" = ["T201", "INP001", "D103"]
 # The training pipeline is a set of standalone scripts, not library code.
-"ml/*" = ["T201", "INP001", "D103", "BLE001", "PLC0415", "EXE001", "ANN001", "ANN202", "S101"]
+# The training pipeline is a set of standalone scripts, not library code.
+"ml/*" = [
+  "T201", "INP001", "D103", "BLE001", "PLC0415", "EXE001", "ANN001", "ANN202",
+  "S101", "TRY003", "EM101", "EM102", "E402", "E501", "ERA001", "PLR0915",
+  "PLR2004", "RUF005", "RUF015",
+]
 
 [tool.maturin]
 manifest-path = "rust/badwords-py/Cargo.toml"
