@@ -1,4 +1,4 @@
-﻿hijodeputilla
+hijodeputilla
 hijodeputillas
 hijadeputilla
 hijadeputillas
@@ -246,9 +246,9 @@ follabas
 folladas
 follador
 follados
-follad 
+follad
 follando
-follen 
+follen
 folleteo
 folláis
 fóllame
@@ -309,8 +309,8 @@ follaba
 follada
 follado
 follais
-folla 
-folle 
+folla
+folle
 giñada
 giñado
 giñais
@@ -361,7 +361,6 @@ cagás
 cagón
 carajo
 cojón
-follad
 follar
 follas
 foyada
@@ -399,7 +398,6 @@ cagar
 cagas
 cagó
 cojon
-folla
 follo
 giña
 giño

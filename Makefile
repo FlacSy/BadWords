@@ -1,6 +1,16 @@
-.PHONY: develop build build-pypi test test-rust test-python test-wasm bench bench-rust bench-python bench-compare quality-compare lint lint-fix format format-fix wasm wasm-nodejs npm-publish npm-publish-nodejs lang-packages npm-publish-languages ml-prepare ml-prepare-full ml-train ml-test ml-quantize ml-package
+.PHONY: sync-resources check-resources develop build build-pypi test test-rust test-python test-wasm bench bench-rust bench-python bench-compare quality-compare lint lint-fix format format-fix wasm wasm-nodejs npm-publish npm-publish-nodejs lang-packages npm-publish-languages ml-prepare ml-prepare-full ml-train ml-test ml-quantize ml-package
 
-develop:
+# The canonical resources live in the crate; python/badwords/resource is a
+# mirror so that maturin ships them inside the wheel.
+sync-resources:
+	rsync -a --delete rust/badwords-core/resources/ python/badwords/resource/
+
+check-resources:
+	@diff -r rust/badwords-core/resources python/badwords/resource \
+		&& echo "resources in sync" \
+		|| (echo "run: make sync-resources"; exit 1)
+
+develop: sync-resources
 	cd python && maturin develop
 	@SO=$$(find .venv -name "_native*.so" 2>/dev/null | head -1); \
 	if [ -n "$$SO" ]; then mkdir -p _native && cp "$$SO" _native/; fi

@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "languages": {
+    "cs": { "name": "Czech", "file": "cs.txt" },
+    "da": { "name": "Danish", "file": "da.txt" },
+    "de": { "name": "German", "file": "de.txt" },
+    "el": { "name": "Greek", "file": "el.txt" },
+    "en": { "name": "English", "file": "en.txt" },
+    "es": { "name": "Spanish", "file": "es.txt" },
+    "es_419": { "name": "Spanish (Latin America)", "file": "es_419.txt" },
+    "fi": { "name": "Finnish", "file": "fi.txt" },
+    "fr": { "name": "French", "file": "fr.txt" },
+    "hu": { "name": "Hungarian", "file": "hu.txt" },
+    "id": { "name": "Indonesian", "file": "id.txt" },
+    "it": { "name": "Italian", "file": "it.txt" },
+    "ja": { "name": "Japanese", "file": "ja.txt" },
+    "ko": { "name": "Korean", "file": "ko.txt" },
+    "nl": { "name": "Dutch", "file": "nl.txt" },
+    "no": { "name": "Norwegian", "file": "no.txt" },
+    "pl": { "name": "Polish", "file": "pl.txt" },
+    "pt": { "name": "Portuguese", "file": "pt.txt" },
+    "pt_br": { "name": "Portuguese (Brazil)", "file": "pt_br.txt" },
+    "ro": { "name": "Romanian", "file": "ro.txt" },
+    "ru": { "name": "Russian", "file": "ru.txt" },
+    "sv": { "name": "Swedish", "file": "sv.txt" },
+    "th": { "name": "Thai", "file": "th.txt" },
+    "tr": { "name": "Turkish", "file": "tr.txt" },
+    "uk": { "name": "Ukrainian", "file": "uk.txt" }
+  },
+  "aliases": {
+    "cz": { "target": "cs", "deprecated": false },
+    "du": { "target": "nl", "deprecated": false },
+    "gr": { "target": "el", "deprecated": false },
+    "po": { "target": "pt", "deprecated": false },
+    "sp": { "target": "es", "deprecated": false },
+    "tu": { "target": "tr", "deprecated": false },
+    "ua": { "target": "uk", "deprecated": false },
+    "br": {
+      "target": "pt_br",
+      "deprecated": true,
+      "note": "`br` is ISO 639-1 for Breton; this list is Brazilian Portuguese. Use `pt_br`."
+    },
+    "in": {
+      "target": "id",
+      "deprecated": true,
+      "note": "`in` is a retired ISO 639-1 code for Indonesian. Use `id`."
+    },
+    "lt": {
+      "target": "es_419",
+      "deprecated": true,
+      "note": "`lt` is ISO 639-1 for Lithuanian; this list is Latin-American Spanish. Use `es_419`."
+    },
+    "sw": {
+      "target": "sv",
+      "deprecated": true,
+      "note": "`sw` is ISO 639-1 for Swahili; this list is Swedish. Use `sv`."
+    }
+  }
+}
