@@ -51,7 +51,7 @@ pub struct Match {
 pub struct Scratch {
     segments: Vec<Segment>,
     consumed: Vec<bool>,
-    bases: Vec<String>,
+    bases: Vec<Option<String>>,
     subtokens: Vec<(usize, usize)>,
     forms: Vec<(String, MatchKind)>,
     collapsed: Vec<String>,
@@ -76,6 +76,10 @@ pub(crate) struct Ctx<'a> {
 }
 
 /// Run the pipeline. With `first_only`, returns as soon as one match is found.
+///
+/// Segments are walked once, left to right, and a segment's normalized form is
+/// computed only when it is reached. Normalization dominates the cost of
+/// matching, so a hit early in the text must not pay for the whole of it.
 pub(crate) fn find_into(
     ctx: &Ctx<'_>,
     text: &str,
@@ -90,73 +94,188 @@ pub(crate) fn find_into(
     }
 
     tokenize::segments(text, &mut scratch.segments);
-    if scratch.segments.is_empty() {
+    let count = scratch.segments.len();
+    if count == 0 {
         return;
     }
 
-    let whole = opts.span == SpanMode::WholeSegment;
-
-    // Base form of each segment's primary unit.
     scratch.bases.clear();
-    for seg in &scratch.segments {
-        let (s, e) = primary_span(seg, whole);
-        scratch.bases.push(if s < e {
-            ctx.processor.process_text(&text[s..e])
-        } else {
-            String::new()
-        });
-    }
-
+    scratch.bases.resize(count, None);
     scratch.consumed.clear();
-    scratch.consumed.resize(scratch.segments.len(), false);
+    scratch.consumed.resize(count, false);
 
-    if opts.phrases && ctx.dict.has_phrases() {
-        phrase_pass(ctx, text, scratch, out, whole, first_only);
-        if first_only && !out.is_empty() {
-            return;
-        }
-    }
+    let whole = opts.span == SpanMode::WholeSegment;
+    let phrases = opts.phrases && ctx.dict.has_phrases();
 
-    for idx in 0..scratch.segments.len() {
-        if scratch.consumed[idx] {
+    let mut index = 0usize;
+    while index < count {
+        if scratch.consumed[index] {
+            index += 1;
             continue;
         }
-        let seg = scratch.segments[idx];
+
+        ensure_base(ctx, text, scratch, index, whole);
+        if scratch.bases[index]
+            .as_deref()
+            .unwrap_or_default()
+            .is_empty()
+        {
+            index += 1;
+            continue;
+        }
+
+        // A phrase starting here wins over a single-word match on its first
+        // word, which is why it is tried first.
+        if phrases {
+            if let Some(consumed) = match_phrase(ctx, text, scratch, out, index, whole) {
+                if first_only {
+                    return;
+                }
+                index = consumed;
+                continue;
+            }
+        }
+
+        let seg = scratch.segments[index];
         let (span_start, span_end) = primary_span(&seg, whole);
-        if span_start >= span_end && !whole {
-            continue;
-        }
-
-        // The glued form is always tested first, so `f.u.c.k` keeps matching.
-        let base = std::mem::take(&mut scratch.bases[idx]);
+        let base = scratch.bases[index].take().unwrap_or_default();
         let found = match_unit(ctx, text, (span_start, span_end), &base, opts, scratch, out);
-        scratch.bases[idx] = base;
+        scratch.bases[index] = Some(base);
 
         if found {
             if first_only {
                 return;
             }
+            index += 1;
             continue;
         }
 
         if opts.split_on_punctuation {
             tokenize::subtokens(text, span_start, span_end, &mut scratch.subtokens);
             let pieces = std::mem::take(&mut scratch.subtokens);
-            for &(s, e) in &pieces {
-                let sub_base = ctx.processor.process_text(&text[s..e]);
-                if match_unit(ctx, text, (s, e), &sub_base, opts, scratch, out) && first_only {
+            for &(piece_start, piece_end) in &pieces {
+                let sub_base = ctx.processor.process_text(&text[piece_start..piece_end]);
+                let hit = match_unit(
+                    ctx,
+                    text,
+                    (piece_start, piece_end),
+                    &sub_base,
+                    opts,
+                    scratch,
+                    out,
+                );
+                if hit && first_only {
                     scratch.subtokens = pieces;
                     return;
                 }
             }
             scratch.subtokens = pieces;
         }
+
+        index += 1;
     }
 
     resolve_overlaps(out);
     if let Some(max) = opts.max_matches {
         out.truncate(max);
     }
+}
+
+/// Fill in a segment's normalized form if it has not been computed yet.
+fn ensure_base(ctx: &Ctx<'_>, text: &str, scratch: &mut Scratch, index: usize, whole: bool) {
+    if scratch.bases[index].is_some() {
+        return;
+    }
+    let (start, end) = primary_span(&scratch.segments[index], whole);
+    let base = if start < end {
+        ctx.processor.process_text(&text[start..end])
+    } else {
+        String::new()
+    };
+    scratch.bases[index] = Some(base);
+}
+
+/// Try every multi-word entry beginning at `index`.
+///
+/// Exact only: comparing a four-token phrase against arbitrary token pairs
+/// fuzzily is both meaningless and slow. Segments that normalize to nothing -
+/// a lone dash, say - are skipped rather than breaking a phrase, so an entry
+/// written `son - of a bitch` still matches `son of a bitch`.
+///
+/// Returns the index to continue from when a phrase matched.
+fn match_phrase(
+    ctx: &Ctx<'_>,
+    text: &str,
+    scratch: &mut Scratch,
+    out: &mut Vec<Match>,
+    index: usize,
+    whole: bool,
+) -> Option<usize> {
+    let first_base = scratch.bases[index].as_deref()?;
+    let candidates = ctx.dict.phrase_candidates(first_base)?.to_vec();
+    let max_tokens = ctx.dict.max_phrase_tokens();
+    let count = scratch.segments.len();
+
+    // Positions of the next few segments that carry content.
+    let mut window: Vec<usize> = Vec::with_capacity(max_tokens);
+    window.push(index);
+    let mut cursor = index + 1;
+    while window.len() < max_tokens && cursor < count {
+        ensure_base(ctx, text, scratch, cursor, whole);
+        if !scratch.bases[cursor]
+            .as_deref()
+            .unwrap_or_default()
+            .is_empty()
+        {
+            window.push(cursor);
+        }
+        cursor += 1;
+    }
+
+    'candidates: for id in candidates {
+        let entry = ctx.dict.entry(id);
+        let tokens = entry.token_count as usize;
+        if tokens < 2 || tokens > window.len() {
+            continue;
+        }
+
+        let mut expected = entry.form.split(' ');
+        for &segment in &window[..tokens] {
+            let Some(token) = expected.next() else {
+                continue 'candidates;
+            };
+            if scratch.consumed[segment]
+                || scratch.bases[segment].as_deref().unwrap_or_default() != token
+            {
+                continue 'candidates;
+            }
+        }
+        if window[..tokens].iter().any(|&segment| {
+            ctx.dict
+                .is_whitelisted(scratch.bases[segment].as_deref().unwrap_or_default())
+        }) {
+            continue;
+        }
+
+        let (start, _) = primary_span(&scratch.segments[index], whole);
+        let last = window[tokens - 1];
+        let (_, end) = primary_span(&scratch.segments[last], whole);
+        out.push(make_match(
+            ctx,
+            text,
+            start,
+            end,
+            id,
+            1.0,
+            MatchKind::Phrase,
+        ));
+        for &segment in &window[..tokens] {
+            scratch.consumed[segment] = true;
+        }
+        return Some(last + 1);
+    }
+
+    None
 }
 
 fn primary_span(seg: &Segment, whole: bool) -> (usize, usize) {
@@ -305,99 +424,6 @@ fn make_match(
         language: ctx.dict.language_of(id).map(str::to_owned),
         score,
         kind,
-    }
-}
-
-/// Match multi-word entries against runs of consecutive segments.
-///
-/// Exact only: comparing a four-token phrase against arbitrary token pairs
-/// fuzzily is both meaningless and slow.
-///
-/// Segments that normalize to nothing - a lone dash, say - are skipped rather
-/// than breaking a phrase, so an entry written `son - of a bitch` still
-/// matches `son of a bitch`.
-fn phrase_pass(
-    ctx: &Ctx<'_>,
-    text: &str,
-    scratch: &mut Scratch,
-    out: &mut Vec<Match>,
-    whole: bool,
-    first_only: bool,
-) {
-    // Positions of the segments that carry content.
-    let significant: Vec<usize> = (0..scratch.segments.len())
-        .filter(|&i| !scratch.bases[i].is_empty())
-        .collect();
-    if significant.len() < 2 {
-        return;
-    }
-
-    let max_tokens = ctx.dict.max_phrase_tokens();
-    let mut cursor = 0usize;
-
-    while cursor < significant.len() {
-        let first = significant[cursor];
-        if scratch.consumed[first] {
-            cursor += 1;
-            continue;
-        }
-        let Some(candidates) = ctx.dict.phrase_candidates(&scratch.bases[first]) else {
-            cursor += 1;
-            continue;
-        };
-
-        let mut matched = 0usize;
-        'candidates: for &id in candidates {
-            let entry = ctx.dict.entry(id);
-            let k = entry.token_count as usize;
-            if k < 2 || k > max_tokens || cursor + k > significant.len() {
-                continue;
-            }
-
-            let mut tokens = entry.form.split(' ');
-            for offset in 0..k {
-                let segment = significant[cursor + offset];
-                let Some(token) = tokens.next() else {
-                    continue 'candidates;
-                };
-                if scratch.consumed[segment] || scratch.bases[segment] != token {
-                    continue 'candidates;
-                }
-            }
-            if (0..k).any(|o| {
-                ctx.dict
-                    .is_whitelisted(&scratch.bases[significant[cursor + o]])
-            }) {
-                continue;
-            }
-
-            let (start, _) = primary_span(&scratch.segments[first], whole);
-            let last = significant[cursor + k - 1];
-            let (_, end) = primary_span(&scratch.segments[last], whole);
-            out.push(make_match(
-                ctx,
-                text,
-                start,
-                end,
-                id,
-                1.0,
-                MatchKind::Phrase,
-            ));
-            for offset in 0..k {
-                scratch.consumed[significant[cursor + offset]] = true;
-            }
-            matched = k;
-            break;
-        }
-
-        if matched > 0 {
-            if first_only {
-                return;
-            }
-            cursor += matched;
-        } else {
-            cursor += 1;
-        }
     }
 }
 
