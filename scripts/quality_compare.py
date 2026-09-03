@@ -13,7 +13,6 @@ from __future__ import annotations
 import argparse
 import random
 import sys
-from pathlib import Path
 
 # Curated: (text, expected_label) where 1=toxic, 0=clean
 QUALITY_TEST_CASES: list[tuple[str, int]] = [
@@ -208,8 +207,7 @@ def main() -> None:
     bw.init(languages=["en", "ru"])
 
     def bw_pred(text: str) -> bool:
-        r = bw.filter_text(text)
-        return bool(r) if isinstance(r, bool) else True
+        return bw.is_profane(text)
 
     m_bw, details_bw = _run_filter("BadWords (rule-based)", bw_pred, cases)
     _print_results("BadWords (rule-based)", m_bw, args.verbose, details_bw)
@@ -232,39 +230,23 @@ def main() -> None:
         print(f"\nglin-profanity (rule-based): SKIPPED (ImportError: {e})")
 
     # --- BadWords ML ---
-    ml_models_dir = Path(__file__).parent.parent / "ml" / "models"
-    if (ml_models_dir / "model.onnx").exists():
-        try:
-            from optimum.onnxruntime import ORTModelForSequenceClassification
-            from transformers import AutoTokenizer
+    # The 3.0 inference path: onnxruntime driven directly, no torch. The model
+    # is used only if it is already cached, so a quality run never starts a
+    # 206 MB download.
+    try:
+        from badwords.ml import ToxicityPredictor, get_model_dir
 
-            bw_ml_model = ORTModelForSequenceClassification.from_pretrained(str(ml_models_dir))
-            bw_ml_tok = AutoTokenizer.from_pretrained(str(ml_models_dir), fix_mistral_regex=True)
+        pred = ToxicityPredictor(get_model_dir(download=False))
+        pred.load()
 
-            def bw_ml_pred(text: str) -> bool:
-                inp = bw_ml_tok(text, return_tensors="pt", truncation=True, max_length=128)
-                prob = bw_ml_model(**inp).logits.softmax(dim=-1)[0, 1].item()
-                return prob >= 0.5
+        def bw_ml_pred(text: str) -> bool:
+            return pred.is_toxic(text)
 
-            m_bw_ml, details_bw_ml = _run_filter("BadWords (ML)", bw_ml_pred, cases)
-            _print_results("BadWords (ML)", m_bw_ml, args.verbose, details_bw_ml)
-            results.append(("BadWords (ML)", m_bw_ml))
-        except Exception as e:
-            print(f"\nBadWords (ML): SKIPPED ({e})")
-    else:
-        try:
-            from badwords.ml import ToxicityPredictor
-
-            pred = ToxicityPredictor()
-
-            def bw_ml_pred(text: str) -> bool:
-                return pred.predict(text) >= 0.5
-
-            m_bw_ml, details_bw_ml = _run_filter("BadWords (ML)", bw_ml_pred, cases)
-            _print_results("BadWords (ML)", m_bw_ml, args.verbose, details_bw_ml)
-            results.append(("BadWords (ML)", m_bw_ml))
-        except Exception as e:
-            print(f"\nBadWords (ML): SKIPPED ({e})")
+        m_bw_ml, details_bw_ml = _run_filter("BadWords (ML)", bw_ml_pred, cases)
+        _print_results("BadWords (ML)", m_bw_ml, args.verbose, details_bw_ml)
+        results.append(("BadWords (ML)", m_bw_ml))
+    except Exception as e:
+        print(f"\nBadWords (ML): SKIPPED ({e})")
 
     # --- glin ML ---
     try:

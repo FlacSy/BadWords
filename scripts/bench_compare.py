@@ -7,7 +7,6 @@ Run: python scripts/bench_compare.py
 import platform
 import sys
 import time
-from pathlib import Path
 
 try:
     from importlib.metadata import version
@@ -79,14 +78,14 @@ def main() -> None:
     print("-" * 55)
 
     # Clean
-    bw_clean = bench(bw.filter_text, texts_clean, iterations=n_bw)
+    bw_clean = bench(bw.is_profane, texts_clean, iterations=n_bw)
     glin_clean = bench(glin.is_profane, texts_clean, iterations=n_glin)
     print(
         f"Clean text:     BadWords {bw_clean:>7.2f} µs ({_throughput(bw_clean)})  |  glin {glin_clean:>7.2f} µs ({_throughput(glin_clean)})"
     )
 
     # Bad
-    bw_bad = bench(bw.filter_text, texts_bad, iterations=n_bw)
+    bw_bad = bench(bw.is_profane, texts_bad, iterations=n_bw)
     glin_bad = bench(glin.is_profane, texts_bad, iterations=n_glin)
     print(
         f"Bad word:       BadWords {bw_bad:>7.2f} µs ({_throughput(bw_bad)})  |  glin {glin_bad:>7.2f} µs ({_throughput(glin_bad)})"
@@ -94,7 +93,7 @@ def main() -> None:
 
     # Censor
     def bw_censor():
-        bw.filter_text(texts_bad, replace_character="*")
+        bw.censor(texts_bad, "*")
 
     def glin_censor_fn():
         glin_replace.check_profanity(texts_bad)
@@ -105,10 +104,10 @@ def main() -> None:
         f"Censor:         BadWords {bw_c:>7.2f} µs ({_throughput(bw_c)})  |  glin {glin_c:>7.2f} µs ({_throughput(glin_c)})"
     )
 
-    # Batch
+    # Batch. glin has no batch API, so it loops; BadWords makes one call and
+    # releases the GIL for all five texts, which is the point of the row.
     def bw_batch():
-        for t in texts_batch:
-            bw.filter_text(t)
+        bw.is_profane_many(texts_batch)
 
     def glin_batch():
         for t in texts_batch:
@@ -176,19 +175,17 @@ def main() -> None:
     except Exception:
         pass
 
-    # BadWords ML (XLM-RoBERTa ONNX)
-    bw_ml_model = None
-    bw_ml_tok = None
-    ml_models_dir = Path(__file__).parent.parent / "ml" / "models"
-    if (ml_models_dir / "model.onnx").exists():
-        try:
-            from optimum.onnxruntime import ORTModelForSequenceClassification
-            from transformers import AutoTokenizer
+    # BadWords ML (XLM-RoBERTa through onnxruntime; nothing here imports torch).
+    # get_model_dir(download=False) keeps a benchmark run from starting a
+    # 206 MB download - if the model is not cached, the row is simply N/A.
+    bw_ml = None
+    try:
+        from badwords.ml import ToxicityPredictor, get_model_dir
 
-            bw_ml_model = ORTModelForSequenceClassification.from_pretrained(str(ml_models_dir))
-            bw_ml_tok = AutoTokenizer.from_pretrained(str(ml_models_dir), fix_mistral_regex=True)
-        except Exception:
-            pass
+        bw_ml = ToxicityPredictor(get_model_dir(download=False))
+        bw_ml.load()
+    except Exception:
+        bw_ml = None
 
     # Run benchmarks for each scenario
     def _run_ml_bench(backend: str, fn, scenario: str) -> None:
@@ -211,13 +208,8 @@ def main() -> None:
             lambda: glin_ml_trans.check_profanity_hybrid(texts_clean),
             "Clean text",
         )
-    if bw_ml_model is not None and bw_ml_tok is not None:
-
-        def _bw_clean():
-            inp = bw_ml_tok(texts_clean, return_tensors="pt", truncation=True, max_length=128)
-            bw_ml_model(**inp).logits.softmax(dim=-1)[0, 1].item()
-
-        _run_ml_bench("bw", _bw_clean, "Clean text")
+    if bw_ml is not None:
+        _run_ml_bench("bw", lambda: bw_ml.predict(texts_clean), "Clean text")
 
     # Bad word
     if glin_ml_light:
@@ -232,13 +224,8 @@ def main() -> None:
             lambda: glin_ml_trans.check_profanity_hybrid(texts_bad),
             "Bad word",
         )
-    if bw_ml_model is not None and bw_ml_tok is not None:
-
-        def _bw_bad():
-            inp = bw_ml_tok(texts_bad, return_tensors="pt", truncation=True, max_length=128)
-            bw_ml_model(**inp).logits.softmax(dim=-1)[0, 1].item()
-
-        _run_ml_bench("bw", _bw_bad, "Bad word")
+    if bw_ml is not None:
+        _run_ml_bench("bw", lambda: bw_ml.predict(texts_bad), "Bad word")
 
     # Batch (5 texts)
     if glin_ml_light:
@@ -255,14 +242,8 @@ def main() -> None:
                 glin_ml_trans.check_profanity_hybrid(t)
 
         _run_ml_bench("glin_trans", _glin_trans_batch, "5 texts batch")
-    if bw_ml_model is not None and bw_ml_tok is not None:
-
-        def _bw_batch():
-            for t in texts_batch:
-                inp = bw_ml_tok(t, return_tensors="pt", truncation=True, max_length=128)
-                bw_ml_model(**inp).logits.softmax(dim=-1)[0, 1].item()
-
-        _run_ml_bench("bw", _bw_batch, "5 texts batch")
+    if bw_ml is not None:
+        _run_ml_bench("bw", lambda: bw_ml.predict_batch(texts_batch), "5 texts batch")
 
     # Print ML results table
     texts_per_scenario = {"Clean text": 1, "Bad word": 1, "5 texts batch": 5}
