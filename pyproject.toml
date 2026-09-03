@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "badwords-py"
-version = "2.3.1"
+version = "3.0.0"
 requires-python = ">=3.10"
 authors = [
   {name = "iamlostshe", email = "vanamelcikov7275@gmail.com"},
@@ -33,7 +33,7 @@ classifiers = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "pytest-benchmark>=4.0", "ruff>=0.4"]
-ml = ["onnxruntime>=1.16", "optimum[onnxruntime]>=1.14", "transformers>=4.36"]
+ml = ["onnxruntime>=1.16", "transformers>=4.36", "numpy>=1.24"]
 
 [project.urls]
 Homepage = "https://badwords.flacsy.dev"
@@ -44,13 +44,50 @@ Issues = "https://github.com/FlacSy/badwords/issues"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = ["benchmark: run benchmarks (deselect with '-m \"not benchmark\"')"]
+filterwarnings = ["error::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+extend-exclude = ["testenv", "target"]
 
 [tool.ruff.lint]
 select = ["ALL"]
-ignore = ["D203", "D213", "COM812"]
+ignore = [
+  "D203",    # conflicts with D211
+  "D213",    # conflicts with D212
+  "COM812",  # conflicts with the formatter
+  "PLR0913", # the native layer legitimately takes one argument per option
+  "RUF001",  # this is a profanity filter: confusable characters are the domain
+  "RUF002",
+  "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests assert, compare against literals and do not need public-API docstrings.
+"tests/*" = [
+  "S101", "PLR2004", "D103", "D102", "ANN001", "ANN201", "SLF001", "INP001",
+  "PLC0415", "E402", "BLE001", "TID252",
+]
+# Scripts and examples are run by hand and print their results.
+# Standalone tooling: prints results, imports lazily, catches broadly on purpose.
+"scripts/*" = [
+  "T201", "INP001", "S603", "S607", "PLC0415", "BLE001", "ANN001", "ANN202",
+  "E501", "PLR2004", "EXE001", "D103", "S110", "ARG001", "C901", "ERA001",
+  "PLR0912", "PLR0915", "TRY300", "PERF203", "S310", "TRY003", "EM101", "EM102",
+  "ANN002", "ANN003", "PLC0206", "S311", "FBT001", "FBT002",
+]
+"examples/*" = ["T201", "INP001", "D103"]
+# The training pipeline is a set of standalone scripts, not library code.
+# The training pipeline is a set of standalone scripts, not library code.
+"ml/*" = [
+  "T201", "INP001", "D103", "BLE001", "PLC0415", "EXE001", "ANN001", "ANN202",
+  "S101", "TRY003", "EM101", "EM102", "E402", "E501", "ERA001", "PLR0915",
+  "PLR2004", "RUF005", "RUF015",
+]
 
 [tool.maturin]
 manifest-path = "rust/badwords-py/Cargo.toml"
 python-source = "python"
 python-packages = ["badwords"]
 module-name = "badwords._native"
+include = [{ path = "python/badwords/py.typed", format = "wheel" }]

@@ -1,0 +1,46 @@
+name: Word list
+description: A word is missing, or something ordinary is being flagged
+labels: [word-list]
+body:
+  - type: input
+    id: language
+    attributes:
+      label: Language code
+      placeholder: "en, ru, pt_br ..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - Missing entry (something profane is not detected)
+        - False positive (something ordinary is flagged)
+    validations:
+      required: true
+
+  - type: textarea
+    id: words
+    attributes:
+      label: Words
+      description: One per line.
+    validations:
+      required: true
+
+  - type: input
+    id: options
+    attributes:
+      label: Options in use
+      description: >
+        False positives depend heavily on this. Substring matching and a fuzzy
+        threshold below 1.0 both trade precision for recall.
+      placeholder: "Options() / Options(match_mode='substring') / ..."
+
+  - type: input
+    id: source
+    attributes:
+      label: Source
+      description: >
+        A citable list the entries come from, if any. See
+        resources/words/SOURCES.md.

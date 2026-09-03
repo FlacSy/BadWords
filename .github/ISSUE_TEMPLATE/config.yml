@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://badwords.flacsy.dev
+    about: API reference and guides

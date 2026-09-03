@@ -30,10 +30,11 @@
   <div id="output"></div>
 
   <script type="module">
-    // Запуск: из корня проекта — make wasm && npx serve . -p 3000
-    // Или: cd examples/wasm/browser && npm start
-    // Открыть: http://localhost:3000/examples/wasm/browser/
-    import init, { ProfanityFilter } from '../../../rust/badwords-wasm/pkg/badwords_wasm.js';
+    // Build:  make wasm
+    // Serve:  npx serve . -p 3000   (from the repository root)
+    //         or: cd examples/wasm/browser && npm start
+    // Open:   http://localhost:3000/examples/wasm/browser/
+    import init, { ProfanityFilter } from '../../../rust/badwords-wasm/pkg-web/badwords_wasm.js';
 
     async function main() {
       try {
@@ -48,16 +49,28 @@
           output.textContent = text;
         }
 
+        // Evasion detection is opt-in; options are a plain object.
+        const strict = {
+          splitOnPunctuation: true,
+          collapseRepeats: true,
+          leetspeak: true,
+        };
+
         document.getElementById('check').onclick = () => {
           const text = input.value;
-          const isBad = filter.isBad(text);
-          showResult(isBad ? 'bad' : 'clean', isBad ? 'Contains profanity!' : 'Text is clean.');
+          const matches = filter.find(text, strict);
+          if (matches.length === 0) {
+            showResult('clean', 'Text is clean.');
+            return;
+          }
+          const detail = matches
+            .map((m) => `${m.matchedText} (${m.word}, ${m.language ?? 'custom'}, ${m.kind})`)
+            .join(', ');
+          showResult('bad', `Contains profanity: ${detail}`);
         };
 
         document.getElementById('censor').onclick = () => {
-          const text = input.value;
-          const censored = filter.censor(text, '*');
-          showResult('censored', censored);
+          showResult('censored', filter.censor(input.value, '*', strict));
         };
       } catch (err) {
         document.getElementById('output').className = 'result bad';
