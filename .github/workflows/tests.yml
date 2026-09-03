@@ -27,9 +27,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       # The whole workspace, not just the core: badwords-py and badwords-wasm
-      # were never even type-checked in CI before.
+      # were never even type-checked in CI before. badwords-ml is left to the
+      # `ml` job below - it pulls an ONNX Runtime binary, which has no business
+      # being downloaded onto three runners.
       - name: Test
-        run: cargo test --workspace --all-features
+        run: cargo test --workspace --exclude badwords-ml --all-features
 
       - name: Build examples
         run: cargo build --examples
@@ -48,7 +50,9 @@ jobs:
         with:
           toolchain: ${{ steps.msrv.outputs.version }}
       - uses: Swatinem/rust-cache@v2
-      - run: cargo check --workspace --all-features
+      # badwords-ml is excluded on purpose: it depends on `ort`, whose own MSRV
+      # is 1.88. The promise being checked here is the one the core makes.
+      - run: cargo check --workspace --exclude badwords-ml --all-features
 
   lint:
     name: Lint and format
@@ -99,6 +103,18 @@ jobs:
           cache: pip
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+
+      # `maturin develop` refuses to run outside a virtualenv, and
+      # actions/setup-python hands out an interpreter rather than one. Make one
+      # and put it on PATH for the rest of the job; `.venv/Scripts` is where
+      # Windows keeps it.
+      - name: Virtualenv
+        shell: bash
+        run: |
+          python -m venv .venv
+          if [ -d .venv/bin ]; then bin=.venv/bin; else bin=.venv/Scripts; fi
+          echo "$PWD/$bin" >> "$GITHUB_PATH"
+          echo "VIRTUAL_ENV=$PWD/.venv" >> "$GITHUB_ENV"
 
       - name: Install
         run: |
@@ -159,6 +175,41 @@ jobs:
             exit 1
           }
 
+  ml:
+    name: ML
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # Nothing here downloads the 206 MB model: the tests that need one skip,
+      # and the rest - the score container, path handling, archive extraction,
+      # the hybrid's wiring - run every time. Before this job, none of the ML
+      # code was so much as imported in CI.
+      - name: Install
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install maturin pytest onnxruntime transformers numpy
+          maturin develop --release
+
+      - name: Python
+        run: .venv/bin/pytest tests/test_ml.py -v
+
+      - name: Rust
+        run: cargo test -p badwords-ml
+
+      - name: The training scripts at least import
+        run: |
+          . .venv/bin/activate
+          python -c "import sys; sys.path.insert(0, 'ml'); import labels, export"
+
   false-positives:
     name: False-positive budget
     runs-on: ubuntu-latest
@@ -197,6 +248,8 @@ jobs:
 
       - name: Python coverage
         run: |
+          python -m venv .venv
+          . .venv/bin/activate
           python -m pip install --upgrade pip
           pip install maturin pytest pytest-cov
           maturin develop --release
