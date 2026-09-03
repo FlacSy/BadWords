@@ -32,6 +32,7 @@ badwords-ml-model-v2.zip
 # Editors and local tooling
 .idea
 .vscode
+.cursor/
 .libtest
 .python-version
 .ai/
