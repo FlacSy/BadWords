@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "rust/badwords-core",
+    "rust/badwords-ml",
     "rust/badwords-py",
     "rust/badwords-wasm",
 ]
@@ -11,7 +12,9 @@ members = [
 [workspace.package]
 version = "3.0.0"
 edition = "2021"
-rust-version = "1.75"
+# Cargo.lock is version 4, which only Cargo 1.78 and later can parse, so
+# anything older cannot build this workspace whatever the sources need.
+rust-version = "1.78"
 license = "MIT"
 repository = "https://github.com/FlacSy/badwords"
 homepage = "https://badwords.flacsy.dev"

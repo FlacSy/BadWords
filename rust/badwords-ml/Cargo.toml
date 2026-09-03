@@ -1,0 +1,29 @@
+[package]
+name = "badwords-ml"
+version.workspace = true
+edition.workspace = true
+# Higher than the rest of the workspace: `ort` requires 1.88. The core stays
+# usable on 1.78, which is what the MSRV job checks.
+rust-version = "1.88"
+description = "Multi-label toxicity scoring for badwords, on ONNX Runtime"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/badwords-ml"
+keywords = ["profanity", "toxicity", "moderation", "onnx", "nlp"]
+categories = ["text-processing"]
+authors.workspace = true
+readme = "README.md"
+
+# The model is a release asset, not part of the crate.
+include = ["src/**/*.rs", "README.md"]
+
+[dependencies]
+badwords-core = { workspace = true, features = ["embedded-words"] }
+ort = "=2.0.0-rc.13"
+tokenizers = { version = "0.23", default-features = false, features = ["onig"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+badwords-core = { workspace = true, features = ["embedded-words"] }
