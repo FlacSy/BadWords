@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, replace
+from functools import lru_cache
 from typing import Any, Literal
 
 MatchMode = Literal["token", "substring"]
@@ -56,8 +57,18 @@ class Options:
         return replace(self, **changes)
 
     def as_kwargs(self) -> dict[str, Any]:
-        """Keyword arguments for the native layer."""
-        return asdict(self)
+        """Keyword arguments for the native layer.
+
+        Cached: an options object is usually reused across many calls, and
+        rebuilding the dict each time is pure overhead on the hot path.
+        """
+        return dict(_as_kwargs(self))
+
+
+@lru_cache(maxsize=128)
+def _as_kwargs(options: Options) -> tuple[tuple[str, Any], ...]:
+    """Immutable form of the keyword arguments, memoized per options object."""
+    return tuple(asdict(options).items())
 
 
 DEFAULT_OPTIONS = Options()
