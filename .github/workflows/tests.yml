@@ -33,12 +33,22 @@ jobs:
         with:
           python-version: "3.12"
 
-      # The whole workspace, not just the core: badwords-py and badwords-wasm
-      # were never even type-checked in CI before. badwords-ml is left to the
-      # `ml` job below - it pulls an ONNX Runtime binary, which has no business
-      # being downloaded onto three runners.
+      # badwords-wasm is type-checked here, which it never used to be.
+      #
+      # badwords-ml is left to the `ml` job below: it pulls an ONNX Runtime
+      # binary, which has no business being downloaded onto three runners.
+      #
+      # badwords-py is excluded because a pyo3 `extension-module` deliberately
+      # does not link libpython - the interpreter supplies those symbols at
+      # import time - and macOS's linker rejects the undefined symbols when it
+      # builds a test harness. The crate has no Rust tests to lose, and the
+      # `python` job compiles it with maturin on all three runners and then
+      # runs the suite against it.
       - name: Test
-        run: cargo test --workspace --exclude badwords-ml --all-features
+        run: cargo test --workspace --exclude badwords-ml --exclude badwords-py --all-features
+
+      - name: Type-check the Python bindings
+        run: cargo check -p badwords-py --all-features
 
       - name: Build examples
         run: cargo build --examples
