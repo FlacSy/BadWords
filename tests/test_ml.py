@@ -39,6 +39,75 @@ def model_dir() -> Path | None:
 requires_model = pytest.mark.skipif(model_dir() is None, reason="no ML model available")
 
 
+class TestScores:
+    """The per-axis score container. Needs no model."""
+
+    def make(self) -> object:
+        from badwords.ml import Scores
+
+        return Scores(
+            labels=("toxicity", "insult", "threat"),
+            values=(0.91, 0.87, 0.02),
+        )
+
+    def test_axes_are_reachable_by_name(self) -> None:
+        scores = self.make()
+        assert scores["insult"] == pytest.approx(0.87)
+        assert scores.get("threat") == pytest.approx(0.02)
+        assert "toxicity" in scores
+
+    def test_unknown_axis_raises_but_get_defaults(self) -> None:
+        scores = self.make()
+        with pytest.raises(KeyError, match="obscene"):
+            _ = scores["obscene"]
+        assert scores.get("obscene") == 0.0
+        assert scores.get("obscene", -1.0) == -1.0
+
+    def test_toxicity_is_the_overall_axis(self) -> None:
+        scores = self.make()
+        assert scores.toxicity == pytest.approx(0.91)
+
+    def test_toxicity_falls_back_to_the_legacy_name(self) -> None:
+        from badwords.ml import Scores
+
+        legacy = Scores(labels=("clean", "toxic"), values=(0.2, 0.8))
+        assert legacy.toxicity == pytest.approx(0.8)
+
+    def test_strongest_and_above_rank_by_score(self) -> None:
+        scores = self.make()
+        assert scores.strongest() == ("toxicity", pytest.approx(0.91))
+        assert [axis for axis, _ in scores.above(0.5)] == ["toxicity", "insult"]
+        assert scores.above(0.95) == []
+
+    def test_as_dict_covers_every_axis(self) -> None:
+        scores = self.make()
+        assert scores.as_dict() == {
+            "toxicity": pytest.approx(0.91),
+            "insult": pytest.approx(0.87),
+            "threat": pytest.approx(0.02),
+        }
+
+
+class TestReleaseAssets:
+    """Publishing rules that keep installed copies working."""
+
+    def test_the_asset_name_is_versioned(self) -> None:
+        from badwords.ml import _paths
+
+        # A 2.x/3.0 client reads output 1 through a softmax. On the multi-label
+        # model that is `severe_toxicity`, so it would call obvious profanity
+        # clean and say nothing. The generation has to be in the file name.
+        assert _paths.ASSET_NAME != _paths.LEGACY_ASSET_NAME
+        assert _paths.ASSET_NAME.endswith(".zip")
+
+    def test_downloads_come_from_a_pinned_release(self) -> None:
+        from badwords.ml import _paths
+
+        # Not "latest": a later release may carry a differently shaped model.
+        assert _paths.MODEL_RELEASE_TAG != "latest"
+        assert _paths.MODEL_RELEASE_TAG.startswith("v")
+
+
 class TestModelPaths:
     """Locating a model."""
 
@@ -166,7 +235,7 @@ class TestPredictor:
 class TestHybridFilter:
     """The rule-plus-model facade."""
 
-    def test_certain_cases_do_not_call_the_model(self) -> None:
+    def test_a_certain_rule_hit_does_not_call_the_model(self) -> None:
         from badwords.ml import HybridFilter
 
         f = HybridFilter(languages=["en"])
@@ -174,36 +243,46 @@ class TestHybridFilter:
         exact = f.check("this is shit")
         assert exact.is_profane is True
         assert exact.decided_by == "rules"
+        assert exact.scores is None
         assert exact.ml_score is None
-
-        clean = f.check("a perfectly ordinary sentence")
-        assert clean.is_profane is False
-        assert clean.decided_by == "rules"
-        assert clean.ml_score is None
-        # The model was never loaded, so nothing was downloaded either.
+        # Nothing was loaded, so nothing was downloaded either.
         assert f.predictor._session is None
 
-    def test_uncertain_cases_go_to_the_model(self) -> None:
+    def test_text_the_rules_do_not_settle_goes_to_the_model(self) -> None:
         from badwords.ml import HybridFilter
 
-        f = HybridFilter(languages=["en"], call_range=(0.85, 0.99))
-        result = f.check("you are a dikhead")
+        f = HybridFilter(languages=["en"])
+
+        # No dictionary entry is anywhere near this, and that is exactly the
+        # case an earlier version answered "clean" without asking anyone.
+        result = f.check("a perfectly ordinary sentence")
+        assert result.decided_by == "model"
+        assert result.scores is not None
+        assert result.is_profane is False
+
+    def test_the_model_supplies_every_axis(self) -> None:
+        from badwords.ml import HybridFilter
+
+        f = HybridFilter(languages=["en"])
+        result = f.check("you are a worthless waste of oxygen")
 
         assert result.decided_by == "model"
-        assert result.ml_score is not None
-        assert 0.85 <= result.rule_score < 0.99
+        assert result.scores is not None
+        assert set(result.scores.labels) == set(f.predictor.labels)
+        assert result.ml_score == pytest.approx(result.scores.toxicity)
 
     def test_check_many_matches_check(self) -> None:
         from badwords.ml import HybridFilter
 
-        f = HybridFilter(languages=["en"], call_range=(0.85, 0.99))
+        f = HybridFilter(languages=["en"])
         texts = ["this is shit", "a clean sentence", "you are a dikhead"]
 
         batched = f.check_many(texts)
+        assert [r.decided_by for r in batched] == [f.check(t).decided_by for t in texts]
         assert [r.is_profane for r in batched] == [f.check(t).is_profane for t in texts]
 
-    def test_rejects_an_invalid_call_range(self) -> None:
+    def test_rejects_a_certainty_outside_the_unit_range(self) -> None:
         from badwords.ml import HybridFilter
 
-        with pytest.raises(ValueError, match="call_range"):
-            HybridFilter(languages=["en"], call_range=(0.99, 0.5))
+        with pytest.raises(ValueError, match="certain_at"):
+            HybridFilter(languages=["en"], certain_at=1.5)

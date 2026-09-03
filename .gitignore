@@ -27,6 +27,7 @@ __pycache__/
 ml/data/
 ml/models/
 badwords-ml-model.zip
+badwords-ml-model-v2.zip
 
 # Editors and local tooling
 .idea

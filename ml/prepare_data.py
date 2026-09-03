@@ -1,256 +1,250 @@
 #!/usr/bin/env python3
-"""Prepare training data from Hugging Face datasets.
+"""Prepare multi-label training data from Hugging Face datasets.
 
-Supports multiple datasets and multilingual sources.
+Every row carries seven targets (see `labels.py`). `civil_comments` supervises
+all of them; the multilingual sources know whether a text is toxic and nothing
+more, so their remaining six are left empty and masked out of the loss rather
+than being guessed at as zero - "not annotated" is not "not toxic".
+
+Writes train.csv, validation.csv and test.csv. The test split comes from each
+source's own held-out split where it has one, so a model can be measured on
+rows the training run could not have seen.
 """
+
+from __future__ import annotations
 
 import argparse
 from pathlib import Path
 
 import pandas as pd
 from datasets import load_dataset
+from labels import LABELS, TEXT_COLUMN
 
-TOXIC_COLUMNS = [
-    "toxic",
-    "severe_toxic",
-    "obscene",
-    "threat",
-    "insult",
-    "identity_hate",
-]
-TEXT_COLUMN = "comment_text"
 OUTPUT_DIR = Path(__file__).parent / "data" / "processed"
 
-# Preset: (dataset_name, text_col, label_source)
-# label_source: "label" | "toxic_*" | "toxicity" (>=0.5) | "paradetox" (input=1, output=0)
-DATASET_PRESETS = {
-    # English, large
-    "civil_comments": ("google/civil_comments", "text", "toxicity"),
-    "toxic_conversations": ("SetFit/toxic_conversations", "text", "label"),
-    # English, parallel detox
-    "paradetox": ("s-nlp/paradetox", None, "paradetox"),
-    # Russian
-    "ru_paradetox": ("s-nlp/ru_paradetox", None, "paradetox"),
-    # Multilingual (9 langs: en, ru, uk, de, es, ar, zh, hi, am)
-    "multilingual_paradetox": ("textdetox/multilingual_paradetox", None, "paradetox"),
+MIN_LENGTH = 3
+MAX_LENGTH = 512
+
+# Sources that annotate every axis, as (dataset, text column).
+FULL_LABEL_SOURCES = {
+    "civil_comments": ("google/civil_comments", "text"),
 }
 
+# Sources that only know overall toxicity, as (dataset, text column, label column).
+BINARY_SOURCES = {
+    "toxic_conversations": ("SetFit/toxic_conversations", "text", "label"),
+    # Russian. Without a source this size the mix is overwhelmingly English,
+    # and the model loses to its own predecessor on Russian text - measured,
+    # not assumed.
+    "toxic_russian": ("AlexSham/Toxic_Russian_Comments", "text", "label"),
+}
 
-def load_single(
-    dataset_name: str,
-    label_source: str,
-    text_col: str | None,
-    max_samples: int | None,
-    min_length: int,
-    max_length: int,
-) -> pd.DataFrame:
-    """Load and process a single dataset."""
-    print(f"  Loading {dataset_name}...")
-    dataset = load_dataset(dataset_name)
-    split = "train" if "train" in dataset else list(dataset.keys())[0]
-    df = dataset[split].to_pandas()
+# Parallel toxic/neutral pairs: the toxic side is 1, the rewritten side is 0.
+PARADETOX_SOURCES = {
+    "paradetox": "s-nlp/paradetox",
+    "ru_paradetox": "s-nlp/ru_paradetox",
+    "multilingual_paradetox": "textdetox/multilingual_paradetox",
+}
 
-    if label_source == "paradetox":
-        # toxic = 1, neutral/detox = 0
-        input_col = next(
-            (
-                c
-                for c in [
-                    "input",
-                    "source",
-                    "toxic",
-                    "en_toxic_comment",
-                    "ru_toxic_comment",
-                    "toxic_sentence",
-                ]
-                if c in df.columns
-            ),
-            None,
-        )
-        output_col = next(
-            (
-                c
-                for c in [
-                    "output",
-                    "target",
-                    "detox",
-                    "en_neutral_comment",
-                    "ru_neutral_comment",
-                    "neutral_sentence",
-                ]
-                if c in df.columns
-            ),
-            None,
-        )
-        if not input_col or not output_col:
-            raise ValueError(
-                f"ParaDetox format needs toxic/neutral columns. Columns: {list(df.columns)}"
-            )
-        toxic_df = df[[input_col]].rename(columns={input_col: TEXT_COLUMN})
-        toxic_df["label"] = 1
-        clean_df = df[[output_col]].rename(columns={output_col: TEXT_COLUMN})
-        clean_df["label"] = 0
-        df = pd.concat([toxic_df, clean_df], ignore_index=True)
-    else:
-        text_col = text_col or next(
-            (
-                c
-                for c in ["comment_text", "text", "comment", "sentence", "content"]
-                if c in df.columns
-            ),
-            None,
-        )
-        if not text_col:
-            raise ValueError(f"Text column not found. Columns: {list(df.columns)}")
-        df = df.rename(columns={text_col: TEXT_COLUMN})
+PARADETOX_TOXIC_COLUMNS = (
+    "input",
+    "source",
+    "toxic",
+    "en_toxic_comment",
+    "ru_toxic_comment",
+    "toxic_sentence",
+)
+PARADETOX_NEUTRAL_COLUMNS = (
+    "output",
+    "target",
+    "detox",
+    "en_neutral_comment",
+    "ru_neutral_comment",
+    "neutral_sentence",
+)
 
-        if label_source == "label":
-            df["label"] = df["label"].astype(int)
-        elif label_source == "toxicity":
-            # civil_comments: toxicity 0-1, threshold 0.5
-            tox_col = next((c for c in ["toxicity", "toxic"] if c in df.columns), None)
-            if not tox_col:
-                raise ValueError(f"Toxicity column not found. Columns: {list(df.columns)}")
-            df["label"] = (df[tox_col].fillna(0) >= 0.5).astype(int)
-        elif label_source.startswith("toxic"):
-            toxic_cols = [c for c in TOXIC_COLUMNS if c in df.columns]
-            df["label"] = df[toxic_cols].max(axis=1).astype(int)
 
+def _frame(texts: pd.Series, values: dict[str, pd.Series | float]) -> pd.DataFrame:
+    """Build a frame with the full label space, unknown axes left as NaN."""
+    df = pd.DataFrame({TEXT_COLUMN: texts.astype(str)})
+    for label in LABELS:
+        df[label] = values.get(label, float("nan"))
+    return df
+
+
+def _clean(df: pd.DataFrame) -> pd.DataFrame:
     df = df.dropna(subset=[TEXT_COLUMN])
-    df[TEXT_COLUMN] = df[TEXT_COLUMN].astype(str)
-    df = df[df[TEXT_COLUMN].str.strip().str.len().between(min_length, max_length)]
-    df = df.drop_duplicates(subset=[TEXT_COLUMN])
-
-    if max_samples and len(df) > max_samples:
-        df = df.sample(n=max_samples, random_state=42)
-
-    return df[["comment_text", "label"]]
+    df[TEXT_COLUMN] = df[TEXT_COLUMN].astype(str).str.strip()
+    df = df[df[TEXT_COLUMN].str.len().between(MIN_LENGTH, MAX_LENGTH)]
+    return df.drop_duplicates(subset=[TEXT_COLUMN])
 
 
-def load_multilingual(max_samples_per_dataset: int | None = None) -> pd.DataFrame:
-    """Load multilingual mix: EN (large) + RU + multilingual paradetox."""
-    dfs = []
-
-    # English: toxic_conversations (1.8M)
-    try:
-        df = load_single(
-            "SetFit/toxic_conversations",
-            "label",
-            "text",
-            max_samples=max_samples_per_dataset,
-            min_length=3,
-            max_length=512,
-        )
-        dfs.append(df)
-    except Exception as e:
-        print(f"  Skip toxic_conversations: {e}")
-
-    # English: civil_comments (2M)
-    try:
-        df = load_single(
-            "google/civil_comments",
-            "toxicity",
-            "text",
-            max_samples=max_samples_per_dataset,
-            min_length=3,
-            max_length=512,
-        )
-        dfs.append(df)
-    except Exception as e:
-        print(f"  Skip civil_comments: {e}")
-
-    # English + Russian + multilingual paradetox
-    for name, (ds, _, src) in DATASET_PRESETS.items():
-        if name in ("paradetox", "ru_paradetox", "multilingual_paradetox") and src == "paradetox":
-            try:
-                df = load_single(ds, src, None, max_samples_per_dataset, 3, 512)
-                dfs.append(df)
-            except Exception as e:
-                print(f"  Skip {name}: {e}")
-
-    if not dfs:
-        raise RuntimeError("No datasets loaded")
-    return pd.concat(dfs, ignore_index=True).drop_duplicates(subset=[TEXT_COLUMN])
+def load_full_labels(dataset: str, text_col: str, split: str) -> pd.DataFrame:
+    """Load a source that annotates all seven axes."""
+    print(f"  {dataset} [{split}] (all axes)")
+    raw = load_dataset(dataset, split=split).to_pandas()
+    values = {label: raw[label].astype(float) for label in LABELS if label in raw.columns}
+    missing = [label for label in LABELS if label not in raw.columns]
+    if missing:
+        print(f"    warning: {dataset} does not annotate {missing}")
+    return _clean(_frame(raw[text_col], values))
 
 
-def balance(df: pd.DataFrame, ratio: float = 0.3, max_total: int | None = None) -> pd.DataFrame:
-    """Balance classes. ratio = fraction of positive samples. max_total caps result size."""
-    pos = df[df["label"] == 1]
-    neg = df[df["label"] == 0]
-    n_pos = len(pos)
-    n_neg = int(n_pos * (1 - ratio) / ratio) if ratio > 0 else len(neg)
-    n_neg = min(n_neg, len(neg))
-    pos_sampled = pos.sample(n=n_pos, random_state=42)
-    neg_sampled = neg.sample(n=n_neg, random_state=42)
-    result = pd.concat([pos_sampled, neg_sampled]).sample(frac=1, random_state=42)
-    if max_total and len(result) > max_total:
-        result = result.sample(n=max_total, random_state=42)
-    return result
+def load_binary(dataset: str, text_col: str, label_col: str, split: str) -> pd.DataFrame:
+    """Load a source that only knows overall toxicity."""
+    print(f"  {dataset} [{split}] (toxicity only)")
+    raw = load_dataset(dataset, split=split).to_pandas()
+    labels = pd.to_numeric(raw[label_col], errors="coerce").astype(float)
+    return _clean(_frame(raw[text_col], {LABELS[0]: labels}))
+
+
+def load_paradetox(dataset: str) -> pd.DataFrame:
+    """Load parallel toxic/neutral pairs as two rows each."""
+    print(f"  {dataset} (toxicity only, parallel pairs)")
+    frames = []
+    splits = load_dataset(dataset)
+    for split_name in splits:
+        raw = splits[split_name].to_pandas()
+        toxic_col = next((c for c in PARADETOX_TOXIC_COLUMNS if c in raw.columns), None)
+        neutral_col = next((c for c in PARADETOX_NEUTRAL_COLUMNS if c in raw.columns), None)
+        if not toxic_col or not neutral_col:
+            print(f"    skip {split_name}: columns {list(raw.columns)}")
+            continue
+        frames.append(_frame(raw[toxic_col], {LABELS[0]: 1.0}))
+        frames.append(_frame(raw[neutral_col], {LABELS[0]: 0.0}))
+    if not frames:
+        return _frame(pd.Series(dtype=str), {})
+    return _clean(pd.concat(frames, ignore_index=True))
+
+
+def reserve_test_rows(
+    df: pd.DataFrame, fraction: float, seed: int
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Split a source into (training pool, reserved test rows).
+
+    Sources with their own held-out split contribute it directly; everything
+    else has to reserve rows here, or it never gets measured at all. The
+    multilingual sources are exactly the "everything else" - without this the
+    test set is English-only and the model's Russian quality is a guess.
+    """
+    if df.empty:
+        return df, df
+    reserved = df.sample(frac=fraction, random_state=seed)
+    return df.drop(reserved.index), reserved
+
+
+def balance(df: pd.DataFrame, ratio: float, cap: int | None, seed: int) -> pd.DataFrame:
+    """Sample down to `ratio` toxic rows, capped at `cap` in total.
+
+    Balancing is on overall toxicity only: the rarer axes (threat, identity
+    attack) are far too sparse to balance without throwing away most of the
+    data, so they are left at their natural rate and the loss handles it.
+    """
+    toxic = df[df[LABELS[0]].fillna(0) >= 0.5]
+    clean = df[df[LABELS[0]].fillna(0) < 0.5]
+    n_clean = int(len(toxic) * (1 - ratio) / ratio) if ratio > 0 else len(clean)
+    sampled = pd.concat([toxic, clean.sample(n=min(n_clean, len(clean)), random_state=seed)])
+    sampled = sampled.sample(frac=1, random_state=seed)
+    if cap and len(sampled) > cap:
+        sampled = sampled.head(cap)
+    return sampled
+
+
+def report(name: str, df: pd.DataFrame) -> None:
+    """Print how many rows supervise each axis, and how many are positive."""
+    print(f"\n{name}: {len(df)} rows")
+    for label in LABELS:
+        known = df[label].notna().sum()
+        positive = (df[label].fillna(0) >= 0.5).sum()
+        share = f"{positive / known:.2%}" if known else "-"
+        print(f"  {label:<18} annotated {known:>7}  positive {positive:>6} ({share})")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Prepare ML training data")
+    parser = argparse.ArgumentParser(description="Prepare multi-label training data")
     parser.add_argument(
-        "--preset",
-        type=str,
-        choices=["single", "multilingual"] + list(DATASET_PRESETS),
-        default="multilingual",
-        help="Preset: multilingual (EN+RU+9langs), single (use --dataset), or preset name",
-    )
-    parser.add_argument(
-        "--dataset",
-        type=str,
-        default="SetFit/toxic_conversations",
-        help="HuggingFace dataset when preset=single",
-    )
-    parser.add_argument(
-        "--max-samples",
+        "--max-per-source",
         type=int,
-        default=None,
-        help="Max samples per dataset (default: 200k for EN, 50k for paradetox)",
+        default=400_000,
+        help="Cap rows taken from each source before balancing",
     )
     parser.add_argument(
-        "--positive-ratio",
+        "--max-total", type=int, default=300_000, help="Cap rows in the training split"
+    )
+    parser.add_argument(
+        "--positive-ratio", type=float, default=0.35, help="Share of toxic rows after balancing"
+    )
+    parser.add_argument(
+        "--validation-size", type=int, default=8_000, help="Rows held out for validation"
+    )
+    parser.add_argument(
+        "--test-fraction",
         type=float,
-        default=0.3,
-        help="Target ratio of positive samples (default: 0.3)",
+        default=0.1,
+        help="Share of a source without its own test split to reserve for testing",
     )
-    parser.add_argument(
-        "--max-total",
-        type=int,
-        default=None,
-        help="Cap total samples after balance (for controlled training time)",
-    )
-    parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=OUTPUT_DIR,
-        help="Output directory",
-    )
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
     args = parser.parse_args()
 
-    if args.preset == "multilingual":
-        df = load_multilingual(args.max_samples)
-    elif args.preset == "single":
-        preset = DATASET_PRESETS.get(args.dataset)
-        if preset:
-            ds_name, text_col, label_src = preset
-        else:
-            ds_name, text_col, label_src = args.dataset, "text", "label"
-        df = load_single(ds_name, label_src, text_col, args.max_samples, 3, 512)
-    else:
-        ds_name, text_col, label_src = DATASET_PRESETS[args.preset]
-        df = load_single(ds_name, label_src, text_col, args.max_samples, 3, 512)
+    print("Loading training sources")
+    frames = []
+    for dataset, text_col in FULL_LABEL_SOURCES.values():
+        frames.append(load_full_labels(dataset, text_col, "train"))
+    for dataset, text_col, label_col in BINARY_SOURCES.values():
+        frames.append(load_binary(dataset, text_col, label_col, "train"))
+    reserved = []
+    for dataset in PARADETOX_SOURCES.values():
+        try:
+            frame = load_paradetox(dataset)
+        except Exception as exc:
+            print(f"    skip {dataset}: {exc}")
+            continue
+        # These sources ship no test split of their own.
+        keep, held = reserve_test_rows(frame, args.test_fraction, args.seed)
+        frames.append(keep)
+        reserved.append(held)
+        print(f"    reserved {len(held)} rows for the test split")
 
-    print(f"Total: {len(df)} samples, {df['label'].sum()} positive ({df['label'].mean():.2%})")
+    frames = [
+        f.sample(n=min(len(f), args.max_per_source), random_state=args.seed)
+        for f in frames
+        if len(f)
+    ]
+    if not frames:
+        raise RuntimeError("no sources loaded")
 
-    df_balanced = balance(df, ratio=args.positive_ratio, max_total=args.max_total)
-    print(f"Balanced: {len(df_balanced)} samples")
+    pool = pd.concat(frames, ignore_index=True).drop_duplicates(subset=[TEXT_COLUMN])
+    report("Pool", pool)
+
+    balanced = balance(pool, args.positive_ratio, args.max_total, args.seed)
+
+    print("\nLoading held-out sources")
+    held_out = []
+    for dataset, text_col in FULL_LABEL_SOURCES.values():
+        held_out.append(load_full_labels(dataset, text_col, "test"))
+    for dataset, text_col, label_col in BINARY_SOURCES.values():
+        held_out.append(load_binary(dataset, text_col, label_col, "test"))
+
+    test = pd.concat([*held_out, *reserved], ignore_index=True).drop_duplicates(
+        subset=[TEXT_COLUMN]
+    )
+    # Anything the training pool touched cannot be part of the test set.
+    test = test[~test[TEXT_COLUMN].isin(set(pool[TEXT_COLUMN]))]
+    test = balance(test, 0.5, 10_000, args.seed)
+
+    validation = balanced.head(args.validation_size)
+    train = balanced.iloc[args.validation_size :]
+
+    report("Train", train)
+    report("Validation", validation)
+    report("Test (held out)", test)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    out_path = args.output_dir / "train.csv"
-    df_balanced.to_csv(out_path, index=False)
-    print(f"Saved to {out_path}")
+    for name, frame in (("train", train), ("validation", validation), ("test", test)):
+        path = args.output_dir / f"{name}.csv"
+        frame.to_csv(path, index=False)
+        print(f"\nSaved {len(frame)} rows to {path}")
 
 
 if __name__ == "__main__":

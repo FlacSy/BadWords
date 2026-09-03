@@ -1,6 +1,8 @@
 PYTHON := $(shell if [ -d .venv ]; then echo .venv/bin/python; else echo python3; fi)
+# Same interpreter, reached from inside ml/
+PY := $(shell if [ -d .venv ]; then echo ../.venv/bin/python; else echo python3; fi)
 
-.PHONY: sync-resources check-resources sync-version check-version fp-report develop build build-pypi test test-rust test-python test-wasm bench bench-rust bench-python bench-compare quality-compare lint lint-fix format format-fix wasm wasm-nodejs wasm-typecheck npm-publish npm-publish-nodejs lang-packages npm-publish-languages ml-prepare ml-prepare-full ml-train ml-test ml-quantize ml-package
+.PHONY: sync-resources check-resources sync-version check-version fp-report develop build build-pypi test test-rust test-python test-wasm bench bench-rust bench-python bench-compare quality-compare lint lint-fix format format-fix wasm wasm-nodejs wasm-typecheck npm-publish npm-publish-nodejs lang-packages npm-publish-languages ml-prepare ml-prepare-full ml-train ml-export ml-evaluate ml-test ml-quantize ml-package
 
 # The canonical resources live in the crate; python/badwords/resource is a
 # mirror so that maturin ships them inside the wheel.
@@ -27,8 +29,10 @@ build-pypi:
 
 test: test-rust test-python test-wasm
 
+# Same command CI runs: the substring tests are behind a feature flag, and
+# `-p badwords-core` alone leaves badwords-py and badwords-wasm unbuilt.
 test-rust:
-	cargo test -p badwords-core
+	cargo test --workspace --all-features
 
 test-python:
 	@if [ -d .venv ]; then .venv/bin/python -m pytest tests/ -v -m "not benchmark"; \
@@ -118,14 +122,22 @@ npm-publish-languages:
 
 # ML training (requires: pip install -r ml/requirements.txt)
 ml-prepare:
-	cd ml && python prepare_data.py --preset multilingual
+	cd ml && $(PY) prepare_data.py
 
-# Full dataset (~600k samples, ~8-10h training with xlm-roberta)
+# Bigger pool, longer training
 ml-prepare-full:
-	cd ml && python prepare_data.py --preset multilingual --max-total 600000
+	cd ml && $(PY) prepare_data.py --max-per-source 800000 --max-total 600000
 
 ml-train:
-	cd ml && python train.py
+	cd ml && $(PY) train.py
+
+# Re-export a trained checkpoint without training it again
+ml-export:
+	cd ml && $(PY) export.py
+
+# Per-axis AUC and best-F1 on the held-out split
+ml-evaluate:
+	cd ml && $(PY) evaluate.py
 
 # ML tests live with the rest of the suite; they skip without a model
 ml-test:
@@ -134,11 +146,29 @@ ml-test:
 
 # Quantize model: 500MB -> ~135MB
 ml-quantize:
-	cd ml && python quantize_model.py
+	cd ml && $(PY) quantize_model.py
 
-# Package ML model for GitHub Release (upload as badwords-ml-model.zip)
-# Quantizes model first (~4x smaller)
-ml-package: ml-quantize
-	@if [ ! -f ml/models/model.onnx ]; then echo "Run ml-train first"; exit 1; fi
-	(cd ml/models && zip -r ../../badwords-ml-model.zip . -x "checkpoints/*" -x "checkpoints/*/*")
-	@echo "Created badwords-ml-model.zip — upload to GitHub Release"
+# Package the model for the GitHub Release (upload as badwords-ml-model.zip).
+# Quantize first, with `make ml-quantize` - this target must not do it itself,
+# because quantizing an already-quantized model is not a no-op.
+# The asset name carries the model generation: code written for the old binary
+# model must never be handed a multi-label one. See ASSET_NAME in
+# python/badwords/ml/_paths.py.
+ML_ASSET := badwords-ml-model-v2.zip
+
+ml-package:
+	@if [ ! -f ml/models/model.onnx ]; then echo "no model: run make ml-train"; exit 1; fi
+	@python3 -c "import json,sys; c=json.load(open('ml/models/config.json')); \
+	  sys.exit(0) if c.get('id2label') and c.get('problem_type') else \
+	  (print('ml/models/config.json has no id2label/problem_type; re-run make ml-export'), sys.exit(1))"
+	@size=$$(stat -c%s ml/models/model.onnx); \
+	  if [ $$size -gt 500000000 ]; then \
+	    echo "model.onnx is $$((size/1000000)) MB - that is the fp32 export; run make ml-quantize first"; \
+	    exit 1; \
+	  fi
+	@rm -f $(ML_ASSET)
+	(cd ml/models && zip -qr ../../$(ML_ASSET) . -x "checkpoints/*" -x "checkpoints/*/*")
+	@echo "Created $(ML_ASSET) ($$(du -h $(ML_ASSET) | cut -f1)) - upload to the GitHub Release"
+	@echo "Keep badwords-ml-model.zip (the old binary model) on that release too:"
+	@echo "  pre-3.1 clients look for it by name, and a multi-label model read"
+	@echo "  by that code reports 0.0004 for obvious profanity."
