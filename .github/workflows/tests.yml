@@ -25,6 +25,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      # badwords-py is a pyo3 extension, so this job builds against whatever
+      # interpreter it finds - and runners have started shipping 3.14, which
+      # pyo3 0.22 refuses ("newer than PyO3's maximum supported version").
+      # Pin one it supports until pyo3 is bumped.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       # The whole workspace, not just the core: badwords-py and badwords-wasm
       # were never even type-checked in CI before. badwords-ml is left to the
@@ -112,9 +119,18 @@ jobs:
         shell: bash
         run: |
           python -m venv .venv
-          if [ -d .venv/bin ]; then bin=.venv/bin; else bin=.venv/Scripts; fi
-          echo "$PWD/$bin" >> "$GITHUB_PATH"
-          echo "VIRTUAL_ENV=$PWD/.venv" >> "$GITHUB_ENV"
+          if [ -d .venv/bin ]; then
+            root="$PWD"
+            bin=".venv/bin"
+          else
+            # Git Bash's $PWD is an MSYS path (/d/a/...), which maturin cannot
+            # resolve once a Windows separator is appended to it. `pwd -W`
+            # gives the native path.
+            root="$(pwd -W)"
+            bin=".venv/Scripts"
+          fi
+          echo "$root/$bin" >> "$GITHUB_PATH"
+          echo "VIRTUAL_ENV=$root/.venv" >> "$GITHUB_ENV"
 
       - name: Install
         run: |
