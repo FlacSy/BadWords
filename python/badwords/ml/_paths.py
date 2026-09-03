@@ -13,7 +13,28 @@ from pathlib import Path
 
 GITHUB_OWNER = "FlacSy"
 GITHUB_REPO = "badwords"
-ASSET_NAME = "badwords-ml-model.zip"
+
+#: Release asset holding the model this version of the code can read.
+#:
+#: The name carries the model's generation, and it must change whenever the
+#: outputs change shape or meaning. The 3.1 model scores seven independent
+#: axes; code written for the 2.x/3.0 model reads output 1 through a softmax,
+#: which on this model is `severe_toxicity` - it would report 0.0004 for
+#: "you are a fucking idiot" and never say a word about it. Publishing a new
+#: model under an old asset name silently breaks every installed copy.
+ASSET_NAME = "badwords-ml-model-v2.zip"
+
+#: What the 2.x/3.0 binary model is published as. Keep uploading it to new
+#: releases: older clients look for it in the *latest* release, and find
+#: nothing if it is absent.
+LEGACY_ASSET_NAME = "badwords-ml-model.zip"
+
+#: Release the model is fetched from unless a caller pins another one.
+#:
+#: Pinned rather than "latest" for the same reason the asset is versioned: a
+#: later release may ship a differently shaped model, and this code should
+#: keep loading the one it was written for. `BADWORDS_ML_TAG` overrides it.
+MODEL_RELEASE_TAG = "v3.0.0"
 
 #: Files a usable model directory must contain. Checking only model.onnx let a
 #: half-extracted download look valid and fail later inside the tokenizer.
@@ -103,14 +124,16 @@ def download_model(*, force: bool = False, tag: str | None = None) -> Path:
     model cached forever.
 
     :param force: Re-download even if a complete model is already cached.
-    :param tag: Release tag to pin. Defaults to the latest release.
+    :param tag: Release tag to fetch from. Defaults to `BADWORDS_ML_TAG`, then
+        to :data:`MODEL_RELEASE_TAG`; pass ``"latest"`` to track the newest
+        release instead.
     :raises ModelDownloadError: If the download fails or the archive is incomplete.
     """
     target = cache_dir() / "model"
     if is_complete(target) and not force:
         return target
 
-    asset_url, expected_size = _find_asset(tag)
+    asset_url, expected_size = _find_asset(tag or os.environ.get("BADWORDS_ML_TAG"))
     cache_dir().mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory(dir=cache_dir(), prefix=".download-") as tmp:
@@ -140,10 +163,11 @@ def download_model(*, force: bool = False, tag: str | None = None) -> Path:
 
 def _find_asset(tag: str | None) -> tuple[str, int | None]:
     """URL and expected size of the model asset in a release."""
-    if tag:
-        api = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/tags/{tag}"
-    else:
+    tag = tag or MODEL_RELEASE_TAG
+    if tag == "latest":
         api = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
+    else:
+        api = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/tags/{tag}"
 
     request = urllib.request.Request(  # noqa: S310 - fixed https URL
         api,
