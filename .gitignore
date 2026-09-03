@@ -1,20 +1,37 @@
-.libtest
-.vscode
-.python-version
+# Build artifacts
+target/
+dist/
+release/
+_native/
+python/badwords/*.so
+*.egg-info
+rust/badwords-wasm/pkg/
+rust/badwords-wasm/pkg-web/
+rust/badwords-wasm/pkg-node/
+
+node_modules/
+
+# Virtual environments
+.venv
+venv
+testenv/
+
+# Caches
 __pycache__/
 .ruff_cache
 .mypy_cache
-dist
-release/
+.pytest_cache/
+.benchmarks/
+
+# ML data and models (see ml/README.md)
 ml/data/
 ml/models/
 badwords-ml-model.zip
-*.egg-info
+badwords-ml-model-v2.zip
+
+# Editors and local tooling
 .idea
-t.py
-test.py
-.venv
-venv
-_native/
-python/badwords/*.so
-target/
+.vscode
+.libtest
+.python-version
+.ai/

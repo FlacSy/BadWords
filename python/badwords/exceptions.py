@@ -1,9 +1,7 @@
-"""Exceptions module."""
+"""Exceptions."""
 
+from __future__ import annotations
 
-class NotSupportedLanguage(Exception):
-    """Unsupported language check."""
+from ._native import NotSupportedLanguage
 
-    def __str__(self) -> str:
-        """String-like representation of exception."""
-        return "This language is not supported"
+__all__ = ["NotSupportedLanguage"]

@@ -1,36 +1,61 @@
 /**
- * BadWords WASM - Node.js TypeScript example
+ * BadWords WASM - Node.js example, in TypeScript.
  *
- * Build: make wasm-nodejs
- * Run: npx tsx examples/wasm/node/index.ts
+ * Build first: make wasm-nodejs
+ * Run:         npx tsx examples/wasm/node/index.ts
+ * Typecheck:   npx tsc --noEmit -p examples/wasm/node
+ *
+ * The types come from the .d.ts wasm-pack generates, so a rename in the Rust
+ * layer becomes a compile error here.
  */
 
-// @ts-ignore - CommonJS wasm module
-const { ProfanityFilter } = require('../../../rust/badwords-wasm/pkg/badwords_wasm.js');
+import type { Match, MatchOptions } from '../../../rust/badwords-wasm/pkg-node/badwords_wasm';
+import { ProfanityFilter } from '../../../rust/badwords-wasm/pkg-node/badwords_wasm';
 
 function main(): void {
-  const filter = new ProfanityFilter();
+  const filter: ProfanityFilter = new ProfanityFilter();
 
-  console.log('Languages:', filter.getLanguages());
+  console.log('languages:', filter.loadedLanguages().join(', '));
+  console.log('entries:  ', filter.wordCount());
   console.log('');
 
-  const tests = [
+  const messages: string[] = [
     'Hello, nice day!',
-    'Some bad word here',
-    'h3ll0 with numbers',
-    'привет мир',
+    'sonofabitch',
+    'hey shit, ok',
+    'a clean sentence',
   ];
 
-  for (const text of tests) {
-    const isBad = filter.isBad(text);
-    const censored = filter.censor(text, '*');
-    console.log(`"${text}"`);
-    console.log(`  isBad: ${isBad}, censored: "${censored}"`);
-    console.log('');
+  for (const message of messages) {
+    const status = filter.isProfane(message) ? 'BLOCKED' : 'OK';
+    console.log(`[${status.padEnd(7)}] ${filter.censor(message, '*')}`);
   }
 
-  filter.addWords(['custom_bad_word']);
-  console.log('After adding "custom_bad_word":', filter.isBad('This has custom_bad_word'));
+  // find() reports what matched, where, and in which language.
+  const matches: Match[] = filter.find('what a shitty, damn mess');
+  for (const match of matches) {
+    console.log(
+      `  ${match.matchedText} at ${match.start}..${match.end} ` +
+        `(${match.word}, ${match.language ?? 'custom'}, ${match.kind})`,
+    );
+  }
+
+  // Project-specific words, and words that must never be flagged.
+  filter.addWords(['spam_link']);
+  filter.addWhitelist(['assessment']);
+  console.log('\ncustom word:', filter.isProfane('visit spam_link now'));
+  console.log('whitelisted:', filter.isProfane('your assessment was wrong'));
+
+  // Evasion detection is opt-in. Options are a plain object, so the same one
+  // can be reused across calls.
+  const strict: MatchOptions = {
+    collapseRepeats: true,
+    leetspeak: true,
+    splitOnPunctuation: true,
+  };
+  for (const text of ['shiiit', 'you.shit']) {
+    console.log(`  ${text}: default=${filter.isProfane(text)} strict=${filter.isProfane(text, strict)}`);
+  }
 }
 
 main();

@@ -1,0 +1,10 @@
+---
+description: Git commit rules — never add Cursor attribution
+alwaysApply: true
+---
+
+# Git Commits
+
+**Never** add "Made-with: Cursor" or any Cursor/IDE attribution to commit messages.
+
+Commit messages must contain only the actual change description — no footers, no tool credits.

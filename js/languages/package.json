@@ -1,6 +1,6 @@
 {
   "name": "@badwords/languages",
-  "version": "2.2.0",
+  "version": "3.0.0",
   "description": "Optional language word lists for badwords-wasm",
   "license": "MIT",
   "repository": {
@@ -17,36 +17,52 @@
     "languages"
   ],
   "exports": {
-    "./br": "./lang/br.json",
-    "./cz": "./lang/cz.json",
+    "./cs": "./lang/cs.json",
     "./da": "./lang/da.json",
     "./de": "./lang/de.json",
-    "./du": "./lang/du.json",
+    "./el": "./lang/el.json",
     "./en": "./lang/en.json",
+    "./es": "./lang/es.json",
+    "./es_419": "./lang/es_419.json",
     "./fi": "./lang/fi.json",
     "./fr": "./lang/fr.json",
-    "./gr": "./lang/gr.json",
     "./hu": "./lang/hu.json",
-    "./in": "./lang/in.json",
+    "./id": "./lang/id.json",
     "./it": "./lang/it.json",
     "./ja": "./lang/ja.json",
     "./ko": "./lang/ko.json",
-    "./lt": "./lang/lt.json",
+    "./nl": "./lang/nl.json",
     "./no": "./lang/no.json",
     "./pl": "./lang/pl.json",
-    "./po": "./lang/po.json",
+    "./pt": "./lang/pt.json",
+    "./pt_br": "./lang/pt_br.json",
     "./ro": "./lang/ro.json",
     "./ru": "./lang/ru.json",
-    "./sp": "./lang/sp.json",
-    "./sw": "./lang/sw.json",
+    "./sv": "./lang/sv.json",
     "./th": "./lang/th.json",
-    "./tu": "./lang/tu.json",
-    "./ua": "./lang/ua.json",
-    ".": "./index.js",
+    "./tr": "./lang/tr.json",
+    "./uk": "./lang/uk.json",
+    "./br": "./lang/pt_br.json",
+    "./cz": "./lang/cs.json",
+    "./du": "./lang/nl.json",
+    "./gr": "./lang/el.json",
+    "./in": "./lang/id.json",
+    "./lt": "./lang/es_419.json",
+    "./po": "./lang/pt.json",
+    "./sp": "./lang/es.json",
+    "./sw": "./lang/sv.json",
+    "./tu": "./lang/tr.json",
+    "./ua": "./lang/uk.json",
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
     "lang",
-    "index.js"
-  ]
+    "index.js",
+    "index.d.ts"
+  ],
+  "types": "./index.d.ts"
 }

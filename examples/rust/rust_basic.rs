@@ -1,34 +1,46 @@
-//! Basic usage of badwords-rs
+//! Basic usage of badwords-core.
 //!
 //! Run: cargo run --example rust_basic
 
-use badwords_core::{default_resource_dir, ProfanityFilter};
+use badwords_core::{Options, ProfanityFilter};
 
-fn main() {
-    let resource_dir = default_resource_dir();
-    let mut filter = ProfanityFilter::new(&resource_dir, true, true, true, true);
+fn main() -> Result<(), badwords_core::Error> {
+    // Resources are compiled into the crate, so nothing has to be located at
+    // runtime. Use `.resource_dir(path)` for a custom set of word lists.
+    let mut filter = ProfanityFilter::builder()
+        .embedded()
+        .all_languages()
+        .build()?;
 
-    filter.init(None).expect("Failed to init");
+    let opts = Options::new();
 
-    // Check clean text
-    let (found, _) = filter.filter_text("hello world", 1.0, None);
-    println!("'hello world' contains profanity: {}", found);
+    println!(
+        "'hello world' is profane: {}",
+        filter.is_profane("hello world", opts)
+    );
+    println!(
+        "'sonofabitch' is profane: {}",
+        filter.is_profane("sonofabitch", opts)
+    );
 
-    // Check text with profanity
-    let (found, _) = filter.filter_text("sonofabitch", 1.0, None);
-    println!("'sonofabitch' contains profanity: {}", found);
+    filter.add_words(&["custombad"]);
+    println!(
+        "'custombad' is profane: {}",
+        filter.is_profane("custombad", opts)
+    );
 
-    // Add custom words
-    filter.add_words(&["custombad".to_string()]);
-    let (found, _) = filter.filter_text("custombad", 1.0, None);
-    println!("'custombad' (custom) contains profanity: {}", found);
+    // Censoring keeps everything that is not part of a match, punctuation included.
+    filter.add_words(&["bad"]);
+    println!("Censored: {}", filter.censor("a bad word, ok?", '*', opts));
 
-    // Censoring (add word for predictable result)
-    filter.add_words(&["bad".to_string()]);
-    let (found, result) = filter.filter_text("a bad word", 1.0, Some('*'));
-    if let (true, Some(censored)) = (found, result) {
-        println!("Censored: {}", censored);
+    // `find` reports where each match is and which language it came from.
+    for m in filter.find("what a bad, shitty day", opts) {
+        println!(
+            "  {:?} at {}..{} (word {:?}, language {:?}, {:?})",
+            m.matched_text, m.start, m.end, m.word, m.language, m.kind
+        );
     }
 
-    println!("\nAvailable languages: {:?}", filter.get_all_languages());
+    println!("\nLoaded languages: {}", filter.loaded_languages().len());
+    Ok(())
 }
