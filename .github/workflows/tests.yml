@@ -3,73 +3,287 @@ name: Tests
 on:
   pull_request:
   push:
-    branches: [main, develop]
+    branches: [master, develop]
     tags: ["v*"]
 
 permissions:
   contents: read
 
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
 jobs:
-  test-rust:
-    name: Rust tests
+  rust:
+    name: Rust (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # badwords-py is a pyo3 extension, so this job builds against whatever
+      # interpreter it finds - and runners have started shipping 3.14, which
+      # pyo3 0.22 refuses ("newer than PyO3's maximum supported version").
+      # Pin one it supports until pyo3 is bumped.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # badwords-wasm is type-checked here, which it never used to be.
+      #
+      # badwords-ml is left to the `ml` job below: it pulls an ONNX Runtime
+      # binary, which has no business being downloaded onto three runners.
+      #
+      # badwords-py is excluded because a pyo3 `extension-module` deliberately
+      # does not link libpython - the interpreter supplies those symbols at
+      # import time - and macOS's linker rejects the undefined symbols when it
+      # builds a test harness. The crate has no Rust tests to lose, and the
+      # `python` job compiles it with maturin on all three runners and then
+      # runs the suite against it.
+      - name: Test
+        run: cargo test --workspace --exclude badwords-ml --exclude badwords-py --all-features
+
+      - name: Type-check the Python bindings
+        run: cargo check -p badwords-py --all-features
+
+      - name: Build examples
+        run: cargo build --examples
+
+  msrv:
+    name: Minimum supported Rust version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Read rust-version from the workspace
+        id: msrv
+        run: |
+          version=$(grep -m1 '^rust-version' Cargo.toml | cut -d'"' -f2)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+      - uses: Swatinem/rust-cache@v2
+      # badwords-ml is excluded on purpose: it depends on `ort`, whose own MSRV
+      # is 1.88. The promise being checked here is the one the core makes.
+      - run: cargo check --workspace --exclude badwords-ml --all-features
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Run Rust tests
-        run: cargo test -p badwords-core
-
-  test-python:
-    name: Python tests (${{ matrix.python-version }})
+  lint:
+    name: Lint and format
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --all-features
+
+      - name: Install ruff
+        run: pip install "ruff==0.15.4"
+      - run: ruff check .
+      - run: ruff format --check .
+
+      - name: Versions are in sync
+        run: python scripts/sync_version.py --check
+
+      - name: Resource mirror is in sync
+        run: make check-resources
+
+  python:
+    name: Python ${{ matrix.python-version }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
+        os: [ubuntu-latest]
+        include:
+          - python-version: "3.12"
+            os: macos-latest
+          - python-version: "3.12"
+            os: windows-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Create venv
-        run: python -m venv .venv
-
-      - name: Install dependencies
+      # `maturin develop` refuses to run outside a virtualenv, and
+      # actions/setup-python hands out an interpreter rather than one. Make one
+      # and put it on PATH for the rest of the job; `.venv/Scripts` is where
+      # Windows keeps it.
+      - name: Virtualenv
+        shell: bash
         run: |
-          source .venv/bin/activate
+          python -m venv .venv
+          if [ -d .venv/bin ]; then
+            root="$PWD"
+            bin=".venv/bin"
+          else
+            # Git Bash's $PWD is an MSYS path (/d/a/...), which maturin cannot
+            # resolve once a Windows separator is appended to it. `pwd -W`
+            # gives the native path.
+            root="$(pwd -W)"
+            bin=".venv/Scripts"
+          fi
+          echo "$root/$bin" >> "$GITHUB_PATH"
+          echo "VIRTUAL_ENV=$root/.venv" >> "$GITHUB_ENV"
+
+      - name: Install
+        run: |
           python -m pip install --upgrade pip
-          pip install maturin
-          cd python && maturin develop --release
+          pip install maturin pytest pytest-benchmark
+          maturin develop --release
 
-      - name: Install dev dependencies
-        run: source .venv/bin/activate && pip install pytest pytest-benchmark
+      - name: Test
+        run: pytest tests/ -v -m "not benchmark"
 
-      - name: Run Python tests
-        run: source .venv/bin/activate && pytest tests/ -v -m "not benchmark"
+      - name: Run the examples
+        if: runner.os == 'Linux'
+        run: |
+          python -m examples.python.basic
+          python -m examples.python.chat_moderation
+          python -m examples.python.all_languages
 
-  test-wasm:
-    name: WASM tests
+  wasm:
+    name: WebAssembly
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-      - name: Install wasm-pack
-        run: cargo install wasm-pack
-
-      - name: Run WASM tests
+      - name: Test
         run: cd rust/badwords-wasm && wasm-pack test --node
+
+      - name: Build both targets
+        run: make wasm && make wasm-nodejs
+
+      # The generated .d.ts is only worth anything if something checks it.
+      - name: Typecheck the TypeScript example
+        run: |
+          cd examples/wasm/node
+          npm install --no-fund --no-audit
+          npx tsc --noEmit
+
+      - name: Run the Node.js example
+        run: node examples/wasm/node/index.js
+
+      - name: Language packs are up to date
+        run: |
+          make lang-packages
+          git diff --exit-code js/languages || {
+            echo "js/languages is stale; run: make lang-packages"
+            exit 1
+          }
+
+  ml:
+    name: ML
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # Nothing here downloads the 206 MB model: the tests that need one skip,
+      # and the rest - the score container, path handling, archive extraction,
+      # the hybrid's wiring - run every time. Before this job, none of the ML
+      # code was so much as imported in CI.
+      - name: Install
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install maturin pytest onnxruntime transformers numpy
+          maturin develop --release
+
+      - name: Python
+        run: .venv/bin/pytest tests/test_ml.py -v
+
+      - name: Rust
+        run: cargo test -p badwords-ml
+
+      - name: The training scripts at least import
+        run: |
+          . .venv/bin/activate
+          python -c "import sys; sys.path.insert(0, 'ml'); import labels, export"
+
+  false-positives:
+    name: False-positive budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # The test skips without a word list; install one so it actually runs.
+      - name: Install a system dictionary
+        run: sudo apt-get update && sudo apt-get install -y wamerican
+
+      - name: Measure
+        run: cargo test -p badwords-core --features substring --release --test false_positives
+
+      - name: Report
+        run: cargo run --release -p badwords-core --bin fp_report --features substring
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Rust coverage
+        run: cargo llvm-cov --workspace --all-features --lcov --output-path lcov.info
+
+      - name: Python coverage
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install maturin pytest pytest-cov
+          maturin develop --release
+          pytest tests/ -m "not benchmark" --cov=badwords --cov-report=xml
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: |
+            lcov.info
+            coverage.xml

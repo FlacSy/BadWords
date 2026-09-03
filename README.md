@@ -8,13 +8,12 @@ with multilingual support and evasion detection.**
 ---
 
 [![Tests](https://github.com/FlacSy/badwords/actions/workflows/tests.yml/badge.svg?style=flat-square)](https://github.com/FlacSy/badwords/actions/workflows/tests.yml)
-[![Format](https://github.com/FlacSy/badwords/actions/workflows/format.yml/badge.svg?style=flat-square)](https://github.com/FlacSy/badwords/actions/workflows/format.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/badge/docs-badwords.flacsy.dev-0D9488?style=flat-square)](https://badwords.flacsy.dev)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey?style=flat-square)]()
 
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-3D7A3D?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
-[![Rust](https://img.shields.io/badge/rust-1.70+-orange?style=flat-square)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/rust-1.78+-orange?style=flat-square)](https://www.rust-lang.org/)
 [![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-yellow?style=flat-square&logo=javascript)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 
@@ -29,204 +28,474 @@ with multilingual support and evasion detection.**
 
 [Installation](#-installation) •
 [Quick Start](#-quick-start) •
+[Options](#-options) •
 [Benchmarks](#-benchmarks) •
-[Supported Languages](#-supported-languages) •
-[Evasion Detection](#-advanced-evasion-detection) •
+[ML scoring](#-ml-scoring) •
+[Languages](#-supported-languages) •
+[Evasion Detection](#-evasion-detection) •
+[Migration](#-migrating-from-2x) •
 [Documentation](https://badwords.flacsy.dev)
 
 </div>
+
 ---
 
 ## 📖 Description
 
-`BadWords` is a sophisticated profanity filtering library designed to clean up user-generated content. Unlike simple keyword matching, it uses **similarity scoring**, **homoglyph detection**, and **transliteration** to catch even the most cleverly disguised insults.
+`BadWords` cleans up user-generated content. Unlike plain keyword matching it normalizes text first — NFKC, case folding, confusable characters, homoglyphs and cyrillic/latin transliteration — and then looks the result up in a dictionary of 20330 entries across 25 languages (16981 of them distinct), with optional fuzzy, phrase and substring matching on top.
 
-**Architecture:** The core is implemented in Rust for performance. Python provides a thin API layer with full type hints for IDE/linter support. The Rust library can also be used directly from Rust projects.
+**Architecture:** the engine is Rust. Python gets it through PyO3 with the GIL released around every call, JavaScript through WebAssembly, and Rust projects can depend on the core directly. All three share one set of word lists and one language registry.
 
 ## 📦 Installation
 
 ### Requirements
-- **Recommended:** Python 3.13
-- **Minimum:** Python 3.10+
+- **Python:** 3.10+
+- **Rust (if you use the crate):** 1.78+
 
-### Install via GitHub
-```bash
-pip install git+[https://github.com/FlacSy/badwords.git](https://github.com/FlacSy/badwords.git)
-
-```
-
-### Install via PyPI
+### PyPI
 ```bash
 pip install badwords-py
+```
+
+### From GitHub
+```bash
+pip install git+https://github.com/FlacSy/badwords.git
+```
+
+### Cargo / npm
+```bash
+cargo add badwords-core
+npm install badwords-wasm
 ```
 
 ---
 
 ## ⚡ Quick Start
 
-### Basic Initialization
-
 ```python
 from badwords import ProfanityFilter
 
-# Initialize filter
 p = ProfanityFilter()
+p.init(languages=["en", "ru"])   # or p.init() for all 25
 
-# Load specific languages (e.g., English and Russian)
-p.init(languages=["en", "ru"])
+p.is_profane("hello world")      # False
+p.is_profane("sonofabitch")      # True
 
-# Or load ALL 26+ supported languages
-p.init()
+# Censoring keeps everything that is not part of a match,
+# including the punctuation attached to the word.
+p.censor("hey shit, ok")         # "hey ****, ok"
 
+# find() says what matched, where, and in which language.
+for m in p.find("what a shitty, damn mess"):
+    print(m.matched_text, m.start, m.end, m.word, m.language, m.kind)
 ```
 
-### Checking and Filtering Text
+### Your own words and a whitelist
 
 ```python
-text = "Some very b4d text here"
+p.add_words(["spam_link_v1", "scam_bot_99"])
+p.add_whitelist(["assessment"])   # never reported, whatever the rules say
 
-# 1. Simple check (Returns Boolean)
-is_bad = p.filter_text(text)
-print(is_bad) # True
-
-# 2. Censoring text (Returns String)
-clean_text = p.filter_text(text, replace_character="*")
-print(clean_text) # "Some very *** text here"
-
+p.word_count()        # entries in the dictionary
+p.contains_word("x")  # after normalization
 ```
+
+### Many texts at once
+
+One call into Rust instead of many, with the GIL released for the whole batch:
+
+```python
+p.is_profane_many(["hello", "sonofabitch", "fine"])   # [False, True, False]
+p.find_many(texts)                                    # list[list[Match]]
+p.censor_many(texts, "*")                             # list[str]
+```
+
+---
+
+## 🎛 Options
+
+Every call takes an `Options`; without one the filter's default is used. Each field is off by default, because each detector trades false negatives for false positives.
+
+```python
+from badwords import Options, ProfanityFilter
+
+p = ProfanityFilter()
+p.init(["en"], options=Options(collapse_repeats=True))  # default for this filter
+
+p.is_profane("text", Options(match_threshold=0.9))      # just this call
+```
+
+| Field | Type | Default | What it does |
+|---|---|---|---|
+| `match_threshold` | `float` | `1.0` | Similarity a fuzzy match needs. `1.0` is exact only. |
+| `match_mode` | `"token"` / `"substring"` | `"token"` | Substring also matches entries inside a longer word. |
+| `split_on_punctuation` | `bool` | `False` | Also test the pieces a token splits into: `you.shit`. |
+| `collapse_repeats` | `bool` | `False` | Also test with repeated letters collapsed: `shiiit`, `ffuck`. |
+| `leetspeak` | `bool` | `False` | Read digits as letters: `sh1t`. |
+| `phrases` | `bool` | `True` | Match multi-word entries across consecutive words. |
+| `min_substring_len` | `int` | `6` | In substring mode, ignore entries shorter than this. |
+| `max_matches` | `int / None` | `None` | Stop after this many matches. |
+
+`Options.aggressive()` turns on every detector at threshold 0.9 in substring mode. It is a starting point for measurement, not a recommended default — see the false-positive table below.
+
+Each match is a frozen dataclass:
+
+| Field | Description |
+|---|---|
+| `word` | The dictionary entry that matched, as written in the word list. |
+| `matched_text` | The matched slice, always equal to `text[start:end]`. |
+| `start`, `end` | Byte offsets into the original text. |
+| `language` | Language the entry came from, or `None` for words you added. |
+| `score` | Similarity; `1.0` for anything but a fuzzy match. |
+| `kind` | `exact`, `fuzzy`, `leet`, `collapsed`, `substring` or `phrase`. |
+
+---
+
+## 🧩 Evasion Detection
+
+Normalization is always on: `hеllo` with a Cyrillic `е`, decorative Unicode, diacritics and mixed scripts all fold to the same form before lookup. The rest is opt-in:
+
+```python
+from badwords import Options, ProfanityFilter
+
+p = ProfanityFilter()
+p.init(["en"])
+
+strict = Options(split_on_punctuation=True, collapse_repeats=True, leetspeak=True)
+
+p.is_profane("shiiit")             # False
+p.is_profane("shiiit", strict)     # True — collapse_repeats
+p.is_profane("you.shit", strict)   # True — split_on_punctuation
+p.is_profane("wh0re", strict)      # True — leetspeak
+```
+
+Some leet spellings are in the word lists as literal entries — `sh1t` and `a55`
+ship in `en` — so they match without `leetspeak` at all. The flag is for the
+spellings nobody wrote down.
+
+### What each detector costs
+
+Measured against 73302 clean words from `/usr/share/dict/american-english` with all 25 languages loaded. `cargo run --release -p badwords-core --bin fp_report --features substring` reproduces the table, and `tests/false_positives.rs` fails the build if the budgets regress.
+
+| Mode | False positives | Rate |
+|---|---|---|
+| default (exact) | 0 | 0.000% |
+| `split_on_punctuation` | 0 | 0.000% |
+| `collapse_repeats` | 0 | 0.000% |
+| `leetspeak` | 0 | 0.000% |
+| `match_threshold=0.95` | 591 | 0.806% |
+| `match_threshold=0.90` | 5521 | 7.532% |
+| substring, `min_substring_len=6` | 274 | 0.374% |
+| substring, `min_substring_len=7` | 78 | 0.106% |
+| `Options.aggressive()` | 5658 | 7.719% |
+
+The three character-level detectors are free of false positives on that corpus; fuzzy matching and substring mode are not. Substring is more expensive here than it will be for most users, because a short entry in one language occurs inside ordinary words of another — with English alone the rate at the default length is 0.150%.
 
 ---
 
 ## ⏱ Benchmarks
 
-| CPU | GPU | RAM | OS |
-|-----|-----|-----|----|
-| x86_64 i7 Intel® Core™ i7-10700KF × 16 | NVIDIA GeForce RTX™ 3070 | 64 GB DDR4 3200MHz | Ubuntu 24.04.2 LTS | 
+| CPU | RAM | OS |
+|-----|-----|----|
+| Intel® Core™ i7-10700KF @ 3.80GHz (8C/16T) | 32 GB DDR4 3200MHz | Ubuntu 24.04.2 LTS |
 
+en + ru loaded, default options (exact matching), release builds.
 
-Rule-based matching (en+ru, `match_threshold=1.0`). Run: `make bench`
+**Rust** — criterion, `make bench-rust`:
 
-| Scenario | Rust (badwords-core) | Python (badwords-py) |
-|----------|----------------------|----------------------|
-| Clean text (no match) | ~7.6 µs (~130 K/s) | ~7.7 µs (~130 K/s) |
-| Bad word (match) | ~3.1 µs (~320 K/s) | ~2.7 µs (~370 K/s) |
-| Censor (replace) | ~2.8 µs (~360 K/s) | ~2.5 µs (~400 K/s) |
-| 5 texts batch | ~15 µs (~330 K/s) | ~16 µs (~310 K/s) |
+| Benchmark | Median |
+|---|---|
+| `is_profane`, clean text | 9.6 µs |
+| `is_profane`, text with a match | 1.6 µs |
+| `censor` | 3.1 µs |
+| `is_profane_many`, 5 texts | 12.6 µs |
+| `find_into`, caller-owned scratch | 9.7 µs |
+| `find`, substring mode | 5.3 µs |
+| `find`, `match_threshold=0.9` | 184 µs |
 
-*Python uses Rust via PyO3, overhead minimal.*
+**Python** — pytest-benchmark medians, `make bench-python`:
+
+| Benchmark | Median |
+|---|---|
+| `is_profane`, clean text | 9.0 µs |
+| `is_profane`, text with a match | 4.0 µs |
+| `censor` | 4.2 µs |
+| `find`, clean text | 9.1 µs |
+| `is_profane_many`, 5 texts | 15.5 µs |
+| the same 5 texts, one call each | 21.2 µs |
+| `is_profane`, `match_threshold=0.9` | 18.2 µs |
+
+Two things the numbers show. A match is *cheaper* than clean text, because
+matching stops at the first hit while clean text is normalized to the end. And
+the batch API is worth using: five texts in one call cost 15.5 µs against
+21.2 µs one at a time, since the GIL is released once instead of five times.
 
 ### vs glin-profanity
 
-Rule-based mode, en+ru. Run: `make bench-compare` (requires `pip install glin-profanity`)
+Rule-based mode, en+ru, same texts through each library's own API.
+Run: `make bench-compare` (needs `pip install glin-profanity`). BadWords is
+timed over 50,000 iterations, glin-profanity over 1,000.
 
-| Scenario | BadWords | glin-profanity |
-|----------|----------|----------------|
-| Clean text | ~7 µs (~140 K/s) | ~4.4 ms (~230/s) |
-| Bad word | ~1.3 µs (~770 K/s) | ~0.2 ms (~5 K/s) |
-| Censor | ~1.8 µs (~560 K/s) | ~1.4 ms (~700/s) |
-| 5 texts batch | ~16 µs (~310 K/s) | ~10 ms (~500/s) |
+| Scenario | BadWords | glin-profanity 3.3.0 |
+|----------|----------|----------------------|
+| Clean text (43 chars) | 10.3 µs | 4316 µs |
+| Bad word (8 chars) | 3.0 µs | 886 µs |
+| Censor | 3.1 µs | 1401 µs |
+| 5 texts | 17.8 µs (one batch call) | 9798 µs (five calls) |
 
-*BadWords is ~100–600× faster (Rust core vs pure Python).*
+Roughly 300–550×, which is what a Rust core buys against a pure-Python one.
 
 ### ML mode
 
-`pip install glin-profanity[ml]` + `make bench-compare`. 100 iter each.
+The optional model is XLM-RoBERTa, INT8-quantized, run through ONNX Runtime —
+no torch on the inference path. 100 iterations each, same machine.
 
-| Scenario | BadWords ML (ONNX) | glin transformer |
-|----------|--------------------|-------------------|
-| Clean text (43 chars) | ~6.5 ms (~150/s) | ~27 ms (~37/s) |
-| Bad word (8 chars) | ~4.6 ms (~220/s) | ~21 ms (~47/s) |
-| 5 texts batch (82 chars) | ~24 ms (~210/s) | ~107 ms (~47/s) |
+| Scenario | BadWords ML | glin-profanity (transformer) |
+|----------|-------------|------------------------------|
+| Clean text (43 chars) | 6.8 ms | 27.9 ms |
+| Bad word (8 chars) | 5.1 ms | 26.4 ms |
+| 5 texts | 12.2 ms (2.4 ms/text, batched) | 130.0 ms |
 
-*BadWords ML (XLM-RoBERTa) ~3–4× faster than glin transformer.*
+Cost scales with length, not just count: these are short texts, and a 400-character
+comment filling the 128-token window costs several times more — the held-out
+evaluation, on comments up to 400 characters, averages about 48 ms per text.
+Batch what you can.
 
----
+Model timings are indicative. Repeated runs on this machine varied by up to 2x
+with whatever else it was doing, while the *ratio* to glin's transformer held
+at roughly 4x across every run. Rule-based numbers are far steadier, within
+about 15%.
 
-## 🛠 Methods & API
-
-### `filter_text(text, match_threshold=1.0, replace_character=None)`
-
-The core method of the library.
-
-| Parameter | Type | Default | Description |
-| --- | --- | --- | --- |
-| `text` | `str` | Required | Input text to check. |
-| `match_threshold` | `float` | `1.0` | Similarity threshold (1.0 = exact match, 0.95 = fuzzy). |
-| `replace_character` | `str/None` | `None` | If provided, returns censored string. If None, returns bool. |
-
-> [!WARNING]
-> **Performance Tip:** Using `match_threshold < 1.0` enables fuzzy matching which is slower. Use `1.0` for high-traffic real-time filtering, or `0.95` for a good balance.
+A model call is three orders of magnitude more expensive than a rule call —
+see [ML scoring](#-ml-scoring) for what to do about that.
 
 ---
 
-## 🧩 Advanced Evasion Detection
+## 🤖 ML scoring
 
-Standard filters are easy to bypass. `BadWords` is built to detect:
+```bash
+pip install "badwords-py[ml]"     # onnxruntime + transformers, no torch
+```
 
-* **Homoglyphs:** Detects `hеllo` (using Cyrillic 'е') or `h4llo` (numbers).
-* **Transliteration:** Automatically handles mapping between Cyrillic and Latin alphabets.
-* **Normalization:** Strips diacritics, special characters, and decorative Unicode symbols.
-* **Similarity Analysis:** Uses fuzzy matching to find words with deliberate typos.
-
-### Examples of detected evasions:
+The rules answer "is this word in the dictionary". The model answers "how
+toxic is this text, and in what way" — seven independent probabilities, not a
+single verdict:
 
 ```python
-_filter.filter_text("hеllо")  # Mixed alphabets (Cyrillic + Latin) -> DETECTED
-_filter.filter_text("h3ll0")  # Character substitution -> DETECTED
-_filter.filter_text("h⍺llo")  # Mathematical/Greek symbols -> DETECTED
-_filter.filter_text("привет") # Transliterated matches -> DETECTED
+from badwords.ml import ToxicityPredictor
 
+predictor = ToxicityPredictor()
+scores = predictor.predict_scores("you are a worthless idiot")
+
+scores.toxicity       # 0.97
+scores["insult"]      # 0.92
+scores.strongest()    # ("toxicity", 0.97)
+scores.above(0.5)     # [("toxicity", 0.97), ("insult", 0.92)]
+scores.as_dict()      # every axis
 ```
+
+| Axis | What it means |
+|------|---------------|
+| `toxicity` | Overall. This is the axis a single number comes from. |
+| `severe_toxicity` | Toxic enough that annotators agreed strongly. Rare. |
+| `obscene` | Obscene language. |
+| `threat` | A threat of violence. |
+| `insult` | Directed at a person. |
+| `identity_attack` | Aimed at a group or identity. |
+| `sexual_explicit` | Sexually explicit content. |
+
+The axis names come from the model's own config, so a model you train yourself
+with a different label set stays usable.
+
+### Quality
+
+Measured on 10,000 held-out rows — `civil_comments` and `toxic_conversations`
+test splits, filtered against every row training touched. `make ml-evaluate`
+reproduces it. AUC is threshold-free; "best F1" comes with the threshold that
+reaches it, because one threshold does not fit seven axes of very different
+rarity.
+
+| Axis | AUC | Average precision | Best F1 | at threshold |
+|------|-----|-------------------|---------|--------------|
+| `toxicity` | 0.977 | 0.978 | **0.923** | 0.20 |
+| `insult` | 0.957 | 0.915 | 0.843 | 0.30 |
+| `identity_attack` | 0.966 | 0.628 | 0.630 | 0.30 |
+| `sexual_explicit` | 0.969 | 0.647 | 0.619 | 0.30 |
+| `threat` | 0.972 | 0.531 | 0.571 | 0.30 |
+| `obscene` | 0.955 | 0.596 | 0.570 | 0.40 |
+| `severe_toxicity` | — | — | — | — |
+
+Measured on the INT8 model, the one the release ships: quantizing costs about
+0.3 points of AUC against fp32.
+
+Read AUC and average precision together. Every axis ranks well, but the rare
+ones — `threat` is 1% of rows — have far lower average precision, which is
+what you feel in practice: at a useful precision their recall is modest. Treat
+`toxicity` as the axis to decide on and the narrow ones as the *reason* to show
+("blocked, reads as a threat"), not as triggers of their own.
+
+`severe_toxicity` has no row in the test set where a majority of annotators
+agreed, so there is nothing to score it against at all.
+
+The narrow axes are supervised by English `civil_comments` alone; overall
+toxicity is supervised by every source. Rebalancing the training mix towards
+Russian lifted `toxicity` (0.906 → 0.923 F1) and cost the narrow axes several
+points — English rows in the mix were halved to make room.
+
+### Quality in Russian
+
+English and Russian are measured separately, because they behave differently.
+1000 rows each: the English ones from the held-out split above, the Russian
+ones from `AlexSham/Toxic_Russian_Comments`.
+
+| | English | Russian |
+|---|---|---|
+| AUC | 0.971 | 0.997 |
+| Best F1 | 0.900 @0.25 | 0.976 @0.15 |
+| At the 0.3 default (P / R / F1) | 0.931 / 0.865 / 0.897 | 0.978 / 0.968 / 0.973 |
+| Rules alone (P / R / F1) | 0.873 / 0.274 / 0.417 | 0.969 / 0.502 / 0.661 |
+
+Two things are worth reading off this. The **rules behave differently per
+language** — 50% recall in Russian against 27% in English, because Russian
+profanity is lexical and a dictionary catches it, while English toxicity is
+more often built from ordinary words. And the model's thresholds now sit close
+together (0.25 and 0.15), which one default can serve; an earlier
+English-heavy training mix put them at 0.30 and 0.70, and no single default
+could.
+
+The Russian figure is in-domain: the model trained on other rows of that same
+corpus. Read it as "good on Russian of this kind", not as a cross-corpus
+guarantee.
+
+Neither half replaces the other. The dictionary cannot see toxicity built out
+of ordinary words, which is most of it in English; the model has no notion of
+the project-specific words you add to the dictionary yourself, and no interest
+in matching them exactly. That is what `HybridFilter` is for.
+
+### Rules first, model second
+
+```python
+from badwords.ml import HybridFilter
+
+hybrid = HybridFilter(languages=["en", "ru"])
+
+result = hybrid.check("you are a worthless waste of oxygen")
+result.is_profane     # True
+result.decided_by     # "model" — no dictionary entry to go on
+result.scores         # every axis
+result.rule_score     # what the rules made of it
+```
+
+A certain dictionary hit answers immediately and never reaches the model;
+**everything else** does, text the rules found nothing in included. Treating
+"the rules saw nothing" as "clean" is what makes a hybrid score worse than the
+model it wraps.
+
+The model is downloaded on first use, not on construction — `download_model()`
+warms the cache deliberately, and `BADWORDS_ML_PATH` points at your own.
+
+### From Rust
+
+```toml
+[dependencies]
+badwords-ml = "3"
+```
+
+```rust
+use badwords_ml::ToxicityModel;
+
+let model = ToxicityModel::open_located()?;   // BADWORDS_ML_PATH or the shared cache
+let scores = model.predict("you are an idiot")?;
+
+scores.toxicity();        // 0.94
+scores.get("insult");     // Some(0.93)
+scores.above(0.5);        // [("toxicity", 0.94), ("insult", 0.93)]
+```
+
+`HybridFilter` is there too, with the same semantics as the Python one. The
+crate reads the same model directory the Python package downloads, so the two
+languages score identically — the only difference is batch padding, worth a few
+hundredths on an INT8 model.
+
+Requires Rust 1.88 (`ort`'s own minimum); `badwords-core` still builds on 1.78.
 
 ---
 
 ## 🌍 Supported Languages
 
-`BadWords` supports **25 languages** out of the box:
+25 languages, keyed by ISO 639-1 where one exists. Entry counts as shipped:
 
-| Code | Language | Code | Language | Code | Language |
-|------|----------|------|----------|------|----------|
-| `en` | English | `ru` | Russian | `ua` | Ukrainian |
-| `de` | German | `fr` | French | `it` | Italian |
-| `sp` | Spanish | `pl` | Polish | `cz` | Czech |
-| `ja` | Japanese | `ko` | Korean | `th` | Thai |
-| `br` | Portuguese (BR) | `da` | Danish | `du` | Dutch |
-| `fi` | Finnish | `gr` | Greek | `hu` | Hungarian |
-| `in` | Indonesian | `lt` | Lithuanian | `no` | Norwegian |
-| `po` | Portuguese | `ro` | Romanian | `sw` | Swedish |
-| `tu` | Turkish | | | | |
+| Code | Language | Entries | Code | Language | Entries |
+|------|----------|---------|------|----------|---------|
+| `pl` | Polish | 6974 | `id` | Indonesian | 236 |
+| `ru` | Russian | 3905 | `cs` | Czech | 217 |
+| `uk` | Ukrainian | 2109 | `da` | Danish | 207 |
+| `tr` | Turkish | 1031 | `es_419` | Spanish (Latin America) | 184 |
+| `en` | English | 796 | `sv` | Swedish | 181 |
+| `el` | Greek | 591 | `th` | Thai | 172 |
+| `es` | Spanish | 584 | `ro` | Romanian | 145 |
+| `it` | Italian | 409 | `pt_br` | Portuguese (Brazil) | 121 |
+| `nl` | Dutch | 342 | `no` | Norwegian | 92 |
+| `ko` | Korean | 341 | `fi` | Finnish | 303 |
+| `fr` | French | 295 | `ja` | Japanese | 290 |
+| `hu` | Hungarian | 286 | `pt` | Portuguese | 271 |
+| `de` | German | 248 | | | |
 
-*Use `p.get_all_languages()` in code. Full list with word counts: [badwords.flacsy.dev](https://badwords.flacsy.dev/reference/languages/)*
+```python
+p.available_languages()   # every language that could be loaded
+p.loaded_languages()      # the ones actually loaded, as canonical codes
+p.load_languages(["de"])  # add to what is already loaded
+p.unload_languages(["de"])
+```
+
+### Pre-3.0 codes
+
+The old codes still work as aliases: `cz`→`cs`, `du`→`nl`, `gr`→`el`, `po`→`pt`, `sp`→`es`, `tu`→`tr`, `ua`→`uk`.
+
+Four of them collide with a real ISO 639-1 language and emit a `DeprecationWarning`:
+
+| Old | Now | Why |
+|---|---|---|
+| `br` | `pt_br` | `br` is Breton in ISO; this list is Brazilian Portuguese. |
+| `in` | `id` | `in` is a retired code for Indonesian. |
+| `lt` | `es_419` | `lt` is Lithuanian in ISO; this list is Latin-American Spanish. |
+| `sw` | `sv` | `sw` is Swahili in ISO; this list is Swedish. |
 
 ---
 
 ## 🚀 Full Integration Example
 
 ```python
-from badwords import ProfanityFilter
+from badwords import Options, ProfanityFilter
 
-def monitor_chat():
-    # Setup for a global chat
-    profanity_filter = ProfanityFilter()
-    profanity_filter.init(["en", "ru", "de"])
-    
-    # Custom project-specific banned words
-    profanity_filter.add_words(["spam_link_v1", "scam_bot_99"])
+MODERATION = Options(
+    split_on_punctuation=True,
+    collapse_repeats=True,
+    leetspeak=True,
+)
 
-    user_input = "Hey! Check out this b.a.d.w.o.r.d"
-    
-    # Moderate with high accuracy
-    is_offensive = profanity_filter.filter_text(user_input, match_threshold=0.95)
-    
-    if is_offensive:
-        print("Message blocked: Contains restricted language.")
+
+def monitor_chat() -> None:
+    p = ProfanityFilter()
+    p.init(["en", "ru", "de"], options=MODERATION)
+
+    # Project-specific words, and words that must never be flagged.
+    p.add_words(["spam_link_v1", "scam_bot_99"])
+    p.add_whitelist(["assessment"])
+
+    user_input = "Hey! Check out this cr4p"
+
+    matches = p.find(user_input)
+    if matches:
+        reason = ", ".join(f"{m.word} ({m.kind})" for m in matches)
+        print(f"Message blocked: {reason}")
+        print("Shown instead:", p.censor(user_input))
     else:
-        # Proceed with processing
-        pass
+        print("Message accepted")
+
 
 if __name__ == "__main__":
     monitor_chat()
-
 ```
 
 ---
@@ -237,104 +506,136 @@ Published on [crates.io](https://crates.io/crates/badwords-core):
 
 ```toml
 [dependencies]
-badwords-core = "2"
+badwords-core = "3"
 ```
 
 ```rust
-use badwords_core::{ProfanityFilter, default_resource_dir};
+use badwords_core::{Options, ProfanityFilter};
 
-let resource_dir = default_resource_dir();
-let mut filter = ProfanityFilter::new(&resource_dir, true, true, true, true);
-filter.init(None).unwrap();
-filter.add_words(&["custom".to_string()]);
-let (found, _) = filter.filter_text("hello", 1.0, None);
+let mut filter = ProfanityFilter::builder()
+    .embedded()                    // word lists compiled into the crate
+    .languages(["en", "ru"])       // or .all_languages()
+    .build()?;
+
+let opts = Options::new();
+
+filter.is_profane("hello world", opts);        // false
+filter.censor("hey shit, ok", '*', opts);      // "hey ****, ok"
+
+for m in filter.find("what a shitty, damn mess", opts) {
+    println!("{:?} at {}..{} ({:?})", m.matched_text, m.start, m.end, m.kind);
+}
+
+filter.add_words(&["custombad"]);
+filter.add_whitelist(&["assessment"]);
 ```
 
-## 🌐 WebAssembly (JavaScript/TypeScript)
+`find_first` short-circuits on the first match, and `find_into` reuses caller-owned `Scratch` and output buffers so a hot loop allocates nothing.
 
-Same Rust code for browser and Node.js, compiled to WASM.
+### Crate features
 
-### Build
+| Feature | Default | What it adds |
+|---|---|---|
+| `fs-resources` | ✅ | Load word lists from a directory at runtime. |
+| `embedded-data` | ✅ | Normalization tables and the language registry compiled in. |
+| `embedded-words` | ✅ | Every word list compiled in (~250 KB). |
+| `embedded-words-min` | | English and Russian only (~82 KB), for WebAssembly. |
+| `substring` | | `MatchMode::Substring` via Aho-Corasick. |
+
+Examples: `cargo run --example rust_basic`, `rust_chat_moderation`, `rust_specific_languages`.
+
+## 🌐 WebAssembly (JavaScript / TypeScript)
+
+The same Rust code compiled for the browser and Node.js, with English and Russian built in.
 
 ```bash
-# Browser
-make wasm
-
-# Node.js
-make wasm-nodejs
+npm install badwords-wasm
 ```
-
-### Frontend (browser)
-
-```html
-<script type="module">
-  import init, { ProfanityFilter } from './path/to/badwords_wasm.js';
-  await init();
-  const filter = new ProfanityFilter();
-  console.log(filter.isBad('text'));      // boolean
-  console.log(filter.censor('text', '*')); // string
-</script>
-```
-
-### Backend (Node.js)
 
 ```javascript
-const { ProfanityFilter } = require('badwords-wasm');
+import init, { ProfanityFilter } from 'badwords-wasm';
+
+await init();                       // browser build only
 const filter = new ProfanityFilter();
-filter.isBad('hello');           // false
-filter.censor('bad word', '*');  // "*** word"
-filter.addWords(['custom']);
+
+filter.isProfane('hello');          // false
+filter.censor('hey shit, ok', '*'); // "hey ****, ok"
+filter.find('what a shitty mess');  // [{ word, matchedText, start, end, language, score, kind }]
+
+filter.addWords(['spam_link']);
+filter.addWhitelist(['assessment']);
 ```
 
-### Optional languages (npm)
+Options are a plain object, reusable and checked — an unknown key is an error rather than a silently disabled detector:
 
-Built-in: en and ru. Additional languages via `@badwords/languages`:
+```javascript
+filter.isProfane('sh1t', { leetspeak: true, collapseRepeats: true });
+filter.setOptions({ matchThreshold: 0.9 });   // default for later calls
+```
+
+`Match` and `MatchOptions` are real TypeScript interfaces in the generated `.d.ts`. `filterText`, `isBad` and `getLanguages` still work and are marked `@deprecated`.
+
+### Optional languages (npm)
 
 ```bash
 npm install badwords-wasm @badwords/languages
 ```
 
 ```javascript
-import init, { ProfanityFilter } from 'badwords-wasm';
 import de from '@badwords/languages/de';
-import ua from '@badwords/languages/ua';
+import uk from '@badwords/languages/uk';
 
-await init();
-const filter = new ProfanityFilter();
 filter.addWords(de);
-filter.addWords(ua);
+filter.addWords(uk);
 ```
 
-Available: br, cz, da, de, du, en, fi, fr, gr, hu, in, it, ja, ko, lt, no, pl, po, ro, ru, sp, sw, th, tu, ua. See [@badwords/languages](https://www.npmjs.com/package/@badwords/languages).
+Available: `cs`, `da`, `de`, `el`, `en`, `es`, `es_419`, `fi`, `fr`, `hu`, `id`, `it`, `ja`, `ko`, `nl`, `no`, `pl`, `pt`, `pt_br`, `ro`, `ru`, `sv`, `th`, `tr`, `uk`, plus the pre-3.0 codes as aliases. See [@badwords/languages](https://www.npmjs.com/package/@badwords/languages).
 
-Examples: `examples/wasm/browser/`, `examples/wasm/node/`
-
-## 🔧 Building from source
-
-Requires: Rust, Python, maturin
-
-```bash
-python -m venv .venv && source .venv/bin/activate  # Linux/macOS
-pip install maturin
-make develop
-# or: cd python && maturin build && pip install target/wheels/badwords_py-*.whl
-```
-
-## 🌐 WebAssembly (browser & Node.js)
-
-Build the WASM package (requires [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/)):
+### Build from source
 
 ```bash
 cargo install wasm-pack
-make wasm
+make wasm          # browser  -> rust/badwords-wasm/pkg-web/
+make wasm-nodejs   # Node.js  -> rust/badwords-wasm/pkg-node/
 ```
 
-Output: `rust/badwords-wasm/pkg/` (npm package `badwords-wasm`)
+Examples: `examples/wasm/browser/`, `examples/wasm/node/` (JavaScript and TypeScript).
 
-- **Browser:** Use the generated JS with a bundler or static server. See `examples/wasm/browser/`
-- **Node.js:** `import init, { ProfanityFilter } from 'badwords-wasm'` after `npm install`. See `examples/wasm/node/`
-- **Publish to npm:** `make wasm` or `make wasm-nodejs`, then `make npm-publish`
-- **Optional languages:** `@badwords/languages` — `make lang-packages` then `make npm-publish-languages`
+---
+
+## 🔀 Migrating from 2.x
+
+Everything from 2.x still works and still behaves identically — the deprecated paths are checked against 8736 recorded 2.3.1 responses. They warn, so the move can be gradual.
+
+| 2.x | 3.0 |
+|---|---|
+| `p.filter_text(text)` | `p.is_profane(text)` |
+| `p.filter_text(text, replace_character="*")` | `p.censor(text, "*")` |
+| `p.filter_text(text, match_threshold=0.95)` | `p.is_profane(text, Options(match_threshold=0.95))` |
+| `p.get_all_languages()` | `p.loaded_languages()` / `p.available_languages()` |
+| `ProfanityFilter::new(dir, ..)` (Rust) | `ProfanityFilter::builder()…build()?` |
+| `filter.isBad(text)` (JS) | `filter.isProfane(text)` |
+
+Two behaviour changes worth knowing about:
+
+- **Censoring keeps punctuation.** `censor("hey shit, ok")` returns `"hey ****, ok"`; 2.x returned `"hey ***** ok"` because it replaced the whole whitespace-delimited token. `filter_text` keeps the old behaviour.
+- **Multi-word entries match now.** They could not before, so phrases in the shipped lists never fired. Phrase matching needs two or more consecutive words, so it cannot produce a single-word false positive; turn it off with `Options(phrases=False)`.
+
+---
+
+## 🔧 Building from source
+
+Requires Rust, Python and [maturin](https://www.maturin.rs/).
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install maturin
+make develop        # debug build, installed into the venv
+make test           # rust + python + wasm
+make bench          # criterion + pytest-benchmark
+```
+
+`make develop` mirrors `rust/badwords-core/resources/` into `python/badwords/resource/` first; `make check-resources` verifies the mirror, and CI fails if it drifts.
 
 ## 📚 Documentation
 
@@ -342,17 +643,13 @@ Full documentation (Python, Rust, JavaScript) with examples and API reference: *
 
 ## 🤝 Contributing
 
-Contributions are what make the open-source community an amazing place to learn, inspire, and create.
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+See [CONTRIBUTING.md](CONTRIBUTING.md). Word-list changes have their own checklist there — every entry needs a source, and the false-positive budget is enforced by CI.
 
 ## 📄 License
 
 Distributed under the MIT License. See `LICENSE` for more information.
+
+Word lists incorporate material from [LDNOOBW](https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words) (CC BY 4.0) and [washyourmouthoutwithsoap](https://github.com/thisandagain/washyourmouthoutwithsoap) (MIT); see `NOTICE` and `rust/badwords-core/resources/words/SOURCES.md`.
 
 <div align="center">
 <sub>Developed with ❤️ by <a href="https://github.com/FlacSy">FlacSy</a></sub>

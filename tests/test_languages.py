@@ -1,63 +1,89 @@
-"""Tests for each supported language."""
+"""Language codes, aliases and per-language loading."""
 
 from __future__ import annotations
 
 import pytest
-
 from badwords import ProfanityFilter
+from badwords.exceptions import NotSupportedLanguage
 
-# All languages from python/badwords/resource/words/
+# Canonical codes, as shipped in resources/data/languages.json.
 LANGUAGES = [
-    "br",
-    "cz",
+    "cs",
     "da",
     "de",
-    "du",
+    "el",
     "en",
+    "es",
+    "es_419",
     "fi",
     "fr",
-    "gr",
     "hu",
-    "in",
+    "id",
     "it",
     "ja",
     "ko",
-    "lt",
+    "nl",
     "no",
     "pl",
-    "po",
+    "pt",
+    "pt_br",
     "ro",
     "ru",
-    "sp",
-    "sw",
+    "sv",
     "th",
-    "tu",
-    "ua",
+    "tr",
+    "uk",
 ]
+
+# The codes used before 3.0.0 keep working.
+ALIASES = {
+    "sp": "es",
+    "du": "nl",
+    "po": "pt",
+    "gr": "el",
+    "ua": "uk",
+    "cz": "cs",
+    "tu": "tr",
+    "br": "pt_br",
+    "in": "id",
+    "sw": "sv",
+    "lt": "es_419",
+}
+
+# These four collide with a different real language, so using them warns.
+DEPRECATED_ALIASES = ["br", "in", "lt", "sw"]
+
+
+@pytest.fixture(scope="module")
+def filter_all() -> ProfanityFilter:
+    """Filter with every language loaded."""
+    p = ProfanityFilter()
+    p.init()
+    return p
 
 
 @pytest.mark.parametrize("lang", LANGUAGES)
 def test_language_loads(lang: str) -> None:
-    """Each language loads successfully."""
+    """Each language loads on its own."""
     p = ProfanityFilter()
     p.init(languages=[lang])
-    assert p.get_all_languages() == [lang]
+    assert p.loaded_languages() == [lang]
+    assert p.word_count() > 0
 
 
 @pytest.mark.parametrize("lang", LANGUAGES)
 def test_language_detects_added_word(lang: str) -> None:
-    """Filter detects added word for each language."""
+    """Custom words work whichever language is loaded."""
     p = ProfanityFilter()
     p.init(languages=[lang])
-    test_word = f"langtest_{lang}"
-    p.add_words([test_word])
-    assert p.filter_text(test_word) is True
-    assert p.filter_text("clean text") is False
+    p.add_words([f"langtest{lang}"])
+    assert p.is_profane(f"langtest{lang}") is True
+    assert p.is_profane("clean text") is False
 
 
 @pytest.mark.parametrize("lang", LANGUAGES)
 def test_language_censor_works(lang: str) -> None:
-    """Censoring works for each language."""
+    """Censoring works whichever language is loaded."""
     p = ProfanityFilter()
     p.init(
         languages=[lang],
@@ -65,16 +91,50 @@ def test_language_censor_works(lang: str) -> None:
         processing_replace_homoglyphs=False,
     )
     p.add_words(["badword"])
-    result = p.filter_text("x badword y", replace_character="*")
-    assert isinstance(result, str)
-    assert "badword" not in result
-    assert "*" in result
+    result = p.censor("x badword y")
+    assert result == "x ******* y"
 
 
-@pytest.mark.parametrize("lang", LANGUAGES)
-def test_language_similar_method(lang: str) -> None:
-    """similar() method works after language initialization."""
+@pytest.mark.parametrize(("alias", "canonical"), sorted(ALIASES.items()))
+def test_alias_resolves(alias: str, canonical: str, filter_all: ProfanityFilter) -> None:
+    """Pre-3.0 codes resolve to their canonical form."""
+    assert filter_all.resolve_language(alias) == canonical
+
+
+@pytest.mark.parametrize("alias", DEPRECATED_ALIASES)
+def test_misleading_alias_warns(alias: str) -> None:
+    """Codes that collide with another real language warn on use."""
     p = ProfanityFilter()
-    p.init(languages=[lang])
-    assert p.similar("abc", "abc") == 1.0
-    assert p.similar("abc", "xyz") < 1.0
+    with pytest.deprecated_call():
+        p.init(languages=[alias])
+    assert p.loaded_languages() == [ALIASES[alias]]
+
+
+def test_plain_alias_does_not_warn(recwarn: pytest.WarningsRecorder) -> None:
+    """An alias that is merely non-standard loads quietly."""
+    p = ProfanityFilter()
+    p.init(languages=["sp"])
+    assert p.loaded_languages() == ["es"]
+    assert not [w for w in recwarn if issubclass(w.category, DeprecationWarning)]
+
+
+@pytest.mark.parametrize("code", ["ES_419", "es-419", " es_419 "])
+def test_codes_are_normalized(code: str, filter_all: ProfanityFilter) -> None:
+    """Case, whitespace and hyphens do not matter."""
+    assert filter_all.resolve_language(code) == "es_419"
+
+
+@pytest.mark.parametrize(
+    "attempt",
+    ["../../../etc/passwd", "../en", "en/../../secret", "/etc/passwd"],
+)
+def test_language_codes_cannot_traverse_paths(attempt: str) -> None:
+    """A code is looked up in the registry, never used as a path."""
+    p = ProfanityFilter()
+    with pytest.raises(NotSupportedLanguage):
+        p.init(languages=[attempt])
+
+
+def test_all_languages_available(filter_all: ProfanityFilter) -> None:
+    """Every shipped language is discoverable."""
+    assert sorted(filter_all.available_languages()) == sorted(LANGUAGES)

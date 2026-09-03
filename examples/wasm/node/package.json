@@ -1,5 +1,17 @@
 {
   "name": "badwords-wasm-node-example",
-  "version": "1.0.0",
-  "description": "Node.js example for badwords-wasm"
+  "version": "3.0.0",
+  "private": true,
+  "description": "Node.js example for badwords-wasm",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js",
+    "start:ts": "tsx index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "@types/node": "^22.10.2"
+  }
 }

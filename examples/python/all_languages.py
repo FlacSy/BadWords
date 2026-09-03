@@ -1,25 +1,41 @@
-#!/usr/bin/env python3
-"""Load all available languages.
+"""Load every language at once.
 
-Run: python examples/python/all_languages.py
+Run: python -m examples.python.all_languages
 """
 
-from badwords import ProfanityFilter
+from __future__ import annotations
+
+from badwords import Options, ProfanityFilter
 
 
 def main() -> None:
+    """Load all languages and check a few phrases."""
     p = ProfanityFilter()
-    p.init()  # No languages = load all
+    p.init()
 
-    langs = p.get_all_languages()
-    print(f"Loaded {len(langs)} languages: {langs}")
+    languages = p.loaded_languages()
+    print(f"{len(languages)} languages loaded, {p.word_count()} entries")
+    print(", ".join(languages))
 
-    # Fuzzy matching
+    phrases = [
+        "hello world",
+        "das ist scheisse",
+        "eres un gilipollas",
+        "che cazzo fai",
+        "quelle connerie",
+        "ты полный мудак",
+    ]
+    for phrase in phrases:
+        matches = p.find(phrase)
+        if matches:
+            langs = ", ".join(sorted({m.language or "custom" for m in matches}))
+            print(f"  BLOCKED ({langs}): {p.censor(phrase)}")
+        else:
+            print(f"  OK:                {phrase}")
+
+    # Fuzzy matching catches deliberate typos.
     p.add_words(["badword"])
-    print(
-        "\nFuzzy match 'badw0rd' (threshold=0.9):",
-        p.filter_text("badw0rd", match_threshold=0.9),
-    )
+    print("\nfuzzy 'badw0rd':", p.is_profane("badw0rd", Options(match_threshold=0.9)))
 
 
 if __name__ == "__main__":
