@@ -73,8 +73,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux }}
-          # 3.13 was advertised in the classifiers but never built.
-          args: --release --out dist --interpreter 3.10 3.11 3.12 3.13
+          args: --release --out dist --interpreter 3.10 3.11 3.12 3.13 3.14
           sccache: "true"
 
       - uses: actions/upload-artifact@v7

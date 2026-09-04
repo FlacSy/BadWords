@@ -13,6 +13,7 @@ use pyo3::create_exception;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use pyo3::IntoPyObjectExt;
 
 use badwords_core::{
     Error, LanguageWarning, MatchMode, Options, Processing, ProfanityFilter, ResourceSource,
@@ -287,7 +288,7 @@ impl PyProfanityFilter {
             max_matches,
         )?;
         let filter = Arc::clone(&self.inner);
-        Ok(py.allow_threads(move || filter.is_profane(text, opts)))
+        Ok(py.detach(move || filter.is_profane(text, opts)))
     }
 
     #[pyo3(signature = (text, *, match_threshold=1.0, match_mode="token",
@@ -318,7 +319,7 @@ impl PyProfanityFilter {
             max_matches,
         )?;
         let filter = Arc::clone(&self.inner);
-        Ok(py.allow_threads(move || to_tuples(filter.find(text, opts))))
+        Ok(py.detach(move || to_tuples(filter.find(text, opts))))
     }
 
     #[pyo3(signature = (text, replace_character, *, match_threshold=1.0, match_mode="token",
@@ -354,7 +355,7 @@ impl PyProfanityFilter {
             max_matches,
         )?;
         let filter = Arc::clone(&self.inner);
-        Ok(py.allow_threads(move || filter.censor(text, ch, opts)))
+        Ok(py.detach(move || filter.censor(text, ch, opts)))
     }
 
     #[pyo3(signature = (texts, *, match_threshold=1.0, match_mode="token",
@@ -385,7 +386,7 @@ impl PyProfanityFilter {
             max_matches,
         )?;
         let filter = Arc::clone(&self.inner);
-        Ok(py.allow_threads(move || filter.is_profane_many(&texts, opts)))
+        Ok(py.detach(move || filter.is_profane_many(&texts, opts)))
     }
 
     #[pyo3(signature = (texts, *, match_threshold=1.0, match_mode="token",
@@ -416,7 +417,7 @@ impl PyProfanityFilter {
             max_matches,
         )?;
         let filter = Arc::clone(&self.inner);
-        Ok(py.allow_threads(move || {
+        Ok(py.detach(move || {
             filter
                 .find_many(&texts, opts)
                 .into_iter()
@@ -458,7 +459,7 @@ impl PyProfanityFilter {
             max_matches,
         )?;
         let filter = Arc::clone(&self.inner);
-        Ok(py.allow_threads(move || filter.censor_many(&texts, ch, opts)))
+        Ok(py.detach(move || filter.censor_many(&texts, ch, opts)))
     }
 
     /// The 2.x entry point, kept byte-identical through the core's compat layer.
@@ -470,20 +471,22 @@ impl PyProfanityFilter {
         text: &str,
         match_threshold: f64,
         replace_character: Option<&str>,
-    ) -> PyObject {
+    ) -> PyResult<Py<PyAny>> {
         let replace_char = replace_character.and_then(|s| s.chars().next());
         let filter = Arc::clone(&self.inner);
         let (found, censored) =
-            py.allow_threads(move || filter.filter_text(text, match_threshold, replace_char));
+            py.detach(move || filter.filter_text(text, match_threshold, replace_char));
 
+        // Still a bool-or-str union, because that is what 2.x returned and the
+        // golden fixture holds it to that.
         if replace_character.is_some() {
             match (found, censored) {
-                (true, Some(text)) => text.into_py(py),
-                (true, None) => text.into_py(py),
-                (false, _) => false.into_py(py),
+                (true, Some(text)) => text.into_py_any(py),
+                (true, None) => text.into_py_any(py),
+                (false, _) => false.into_py_any(py),
             }
         } else {
-            found.into_py(py)
+            found.into_py_any(py)
         }
     }
 
@@ -503,7 +506,7 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyProfanityFilter>()?;
     m.add(
         "NotSupportedLanguage",
-        m.py().get_type_bound::<NotSupportedLanguage>(),
+        m.py().get_type::<NotSupportedLanguage>(),
     )?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())

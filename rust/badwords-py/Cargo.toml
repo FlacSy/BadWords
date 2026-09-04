@@ -20,4 +20,4 @@ badwords-core = { workspace = true, features = [
     "embedded-words",
     "substring",
 ] }
-pyo3 = { version = "0.22", features = ["extension-module"] }
+pyo3 = { version = "0.29", features = ["extension-module"] }
