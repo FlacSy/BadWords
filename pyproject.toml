@@ -90,4 +90,11 @@ manifest-path = "rust/badwords-py/Cargo.toml"
 python-source = "python"
 python-packages = ["badwords"]
 module-name = "badwords._native"
-include = [{ path = "python/badwords/py.typed", format = "wheel" }]
+# PyPI rejects a distribution whose metadata names a License-File the archive
+# does not contain, and the sdist otherwise carried only the crate's copies
+# under rust/badwords-core/.
+include = [
+    { path = "python/badwords/py.typed", format = "wheel" },
+    { path = "LICENSE", format = "sdist" },
+    { path = "NOTICE", format = "sdist" },
+]

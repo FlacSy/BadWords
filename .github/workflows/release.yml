@@ -92,6 +92,13 @@ jobs:
         with:
           command: sdist
           args: --out dist
+
+      # PyPI validates License-File at upload time, which is after it has
+      # already accepted the wheels for that version - 3.0.0 went out with 24
+      # wheels and no sdist because of exactly this. `twine check` does not
+      # catch it; it passed on the archive PyPI refused.
+      - name: The sdist is one PyPI will accept
+        run: python scripts/check_sdist.py dist/*.tar.gz
       - uses: actions/upload-artifact@v4
         with:
           name: sdist
