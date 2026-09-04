@@ -59,9 +59,13 @@ jobs:
         with:
           toolchain: ${{ steps.msrv.outputs.version }}
       - uses: Swatinem/rust-cache@v2
-      # badwords-ml is excluded on purpose: it depends on `ort`, whose own MSRV
-      # is 1.88. The promise being checked here is the one the core makes.
-      - run: cargo check --workspace --exclude badwords-ml --all-features
+      # badwords-ml and badwords-py are excluded on purpose: their dependencies
+      # set their own floors - `ort` needs 1.88, pyo3 0.29 needs 1.83 - and
+      # neither crate is something anyone depends on from Rust. The promise
+      # being checked here is the one badwords-core makes.
+      - run: >-
+          cargo check --workspace
+          --exclude badwords-ml --exclude badwords-py --all-features
 
   lint:
     name: Lint and format

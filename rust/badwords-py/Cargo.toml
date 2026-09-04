@@ -2,7 +2,11 @@
 name = "badwords-py"
 version.workspace = true
 edition.workspace = true
-rust-version.workspace = true
+# Higher than the rest of the workspace: pyo3 0.29, which is what supports
+# Python 3.14, requires 1.83. Nobody depends on this crate from Rust - maturin
+# builds it with a current toolchain - so the MSRV that matters is the core's,
+# and that stays at 1.78.
+rust-version = "1.83"
 description = "Python bindings for badwords profanity filter"
 license.workspace = true
 repository.workspace = true
