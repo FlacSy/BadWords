@@ -6,6 +6,6 @@ transformers>=4.36.0
 accelerate>=0.26.0
 torch>=2.13.0
 optimum[onnxruntime]>=1.14.0
-pandas>=2.0.0
+pandas>=2.3.3
 scikit-learn>=1.7.2
 onnx>=1.15.0
