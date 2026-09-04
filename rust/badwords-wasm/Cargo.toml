@@ -8,7 +8,8 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 documentation = "https://badwords.flacsy.dev"
-keywords = ["profanity", "filter", "moderation", "content", "wasm", "webassembly"]
+# crates.io accepts at most five.
+keywords = ["profanity", "filter", "moderation", "wasm", "webassembly"]
 authors.workspace = true
 
 [lib]
