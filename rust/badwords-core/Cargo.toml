@@ -53,7 +53,7 @@ strsim = "0.11"
 aho-corasick = { version = "1.1", optional = true }
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.8"
 proptest = "1"
 strsim = "0.11"
 serde = { version = "1.0", features = ["derive"] }
